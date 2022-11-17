@@ -1,0 +1,6 @@
+celery==5.2.7
+dydx-v3-python==1.9.0
+pandas==1.5.1
+pytest==4.6.11
+python-binance==1.0.16
+stellar-sdk==8.1.1
