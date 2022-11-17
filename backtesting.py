@@ -1,5 +1,6 @@
 import json
 import time
+import matplotlib.pyplot as plt
 import pandas as pd
 import statistics as stats
 from datetime import datetime
@@ -215,6 +216,7 @@ def backtest(df):
     last_price_1 = last_price_2 = bid_price_1 = ask_price_1 = None
     price_diff = price_diff_pos = price_diff_neg = 0
     buy_order_created_at = sell_order_created_at = 0
+    balance_records = []
     count = 0
     for idx, row in df.iterrows():
         if isinstance(row['source_1'], list):
@@ -263,9 +265,16 @@ def backtest(df):
             sell_order_created_at = idx
 
         if count % 1000 == 0:
-            print('TOTAL', balance_quote + balance_base * last_price_1 + balance_perp + short_perp * last_price_2)
+            balance_records.append((idx, balance_quote + balance_base * last_price_1 + balance_perp + short_perp * last_price_2))
         count += 1
-    print('TOTAL', balance_quote + balance_base * last_price_1 + balance_perp + short_perp * last_price_2)
+    plot_results(balance_records)
+
+
+def plot_results(results):
+    plt.plot([r[0] for r in results], [r[1] for r in results])
+    plt.xlabel('Time')
+    plt.ylabel('Balance')
+    plt.show()
 
 
 def launch_backtesting_tool():
