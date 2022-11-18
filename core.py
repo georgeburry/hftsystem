@@ -1,11 +1,12 @@
 import os
+import time
 from stellar_sdk import Asset, ManageBuyOffer, ManageSellOffer, Network, TransactionBuilder
 from connectors import create_dydx_connector, create_sdex_connector
 from dydx3.constants import (
     ORDER_SIDE_BUY,
     ORDER_SIDE_SELL,
     ORDER_TYPE_MARKET,
-    TIME_IN_FORCE_GTT,
+    TIME_IN_FORCE_FOK,
 )
 
 
@@ -21,17 +22,17 @@ class DydxTrader:
     def get_account(self):
         return self.client.private.get_account(
             ethereum_address=os.getenv('DYDX_ETH_ADDRESS')
-        )['account']
+        ).data['account']
 
     def get_equity(self):
-        return self.get_account()['equity']
+        return float(self.get_account()['equity'])
 
     def get_open_positions(self):
-        return self.get_account()['openPositions']
+        return self.get_account()['openPositions'][self.market]
 
-    def create_market_buy_order(price: float, size: float):
-        placed_order = client.private.create_order(
-            position_id=1, # required for creating the order signature
+    def create_market_buy_order(self, price: float, size: float):
+        placed_order = self.client.private.create_order(
+            position_id=self.account['positionId'],
             market=self.market,
             side=ORDER_SIDE_BUY,
             order_type=ORDER_TYPE_MARKET,
@@ -39,13 +40,14 @@ class DydxTrader:
             size=str(size),
             price=str(price),
             limit_fee='0.0005',
-            expiration_epoch_seconds=1613988637,
-            time_in_force=TIME_IN_FORCE_GTT,
+            expiration_epoch_seconds=int(time.time() + 3600),
+            time_in_force=TIME_IN_FORCE_FOK,
         ) 
+        return placed_order
 
-    def create_market_sell_order(price: float, size: float):
-        placed_order = client.private.create_order(
-            position_id=1, # required for creating the order signature
+    def create_market_sell_order(self, price: float, size: float):
+        placed_order = self.client.private.create_order(
+            position_id=self.account['positionId'],
             market=self.market,
             side=ORDER_SIDE_SELL,
             order_type=ORDER_TYPE_MARKET,
@@ -53,9 +55,10 @@ class DydxTrader:
             size=str(size),
             price=str(price),
             limit_fee='0.0005',
-            expiration_epoch_seconds=1613988637,
-            time_in_force=TIME_IN_FORCE_GTT,
-        ) 
+            expiration_epoch_seconds=int(time.time() + 3600),
+            time_in_force=TIME_IN_FORCE_FOK,
+        )
+        return placed_order
 
 
 class SdexTrader:
