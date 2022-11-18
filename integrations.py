@@ -19,6 +19,23 @@ class DydxIntegration:
         self.client = create_dydx_connector()
         self.account = self.get_account() 
 
+    def get_orderbook(self):
+        return self.client.public.get_orderbook(self.market).data
+
+    def get_first_bid(self):
+        orderbook = self.get_orderbook()
+        return {
+            'amount': float(orderbook['bids'][0]['size']),
+            'price': float(orderbook['bids'][0]['price'])
+        }
+
+    def get_first_ask(self):
+        orderbook = self.get_orderbook()
+        return {
+            'amount': float(orderbook['asks'][0]['size']),
+            'price': float(orderbook['asks'][0]['price'])
+        }
+
     def get_account(self):
         return self.client.private.get_account(
             ethereum_address=os.getenv('DYDX_ETH_ADDRESS')
@@ -30,14 +47,14 @@ class DydxIntegration:
     def get_open_positions(self):
         return self.get_account()['openPositions'][self.market]
 
-    def create_market_buy_order(self, price: float, size: float):
+    def create_market_buy_order(self, price: float, amount: float):
         placed_order = self.client.private.create_order(
             position_id=self.account['positionId'],
             market=self.market,
             side=ORDER_SIDE_BUY,
             order_type=ORDER_TYPE_MARKET,
             post_only=False,
-            size=str(size),
+            size=str(amount),
             price=str(price),
             limit_fee='0.0005',
             expiration_epoch_seconds=int(time.time() + 3600),
@@ -45,14 +62,14 @@ class DydxIntegration:
         ) 
         return placed_order
 
-    def create_market_sell_order(self, price: float, size: float):
+    def create_market_sell_order(self, price: float, amount: float):
         placed_order = self.client.private.create_order(
             position_id=self.account['positionId'],
             market=self.market,
             side=ORDER_SIDE_SELL,
             order_type=ORDER_TYPE_MARKET,
             post_only=False,
-            size=str(size),
+            size=str(amount),
             price=str(price),
             limit_fee='0.0005',
             expiration_epoch_seconds=int(time.time() + 3600),
@@ -73,6 +90,23 @@ class SdexIntegration:
         self.counter_asset = Asset('USDC', issuer=issuers['USDC'])
 
         self.client, self.keypair = create_sdex_connector()
+
+    def get_orderbook(self):
+        return self.client.orderbook(self.base_asset, self.counter_asset).call()
+
+    def get_first_bid(self):
+        orderbook = self.get_orderbook()
+        return {
+            'amount': float(orderbook['bids'][0]['amount']),
+            'price': float(orderbook['bids'][0]['price'])
+        }
+
+    def get_first_ask(self):
+        orderbook = self.get_orderbook()
+        return {
+            'amount': float(orderbook['asks'][0]['amount']),
+            'price': float(orderbook['asks'][0]['price'])
+        }
 
     def get_account(self):
         return self.client.load_account(account_id=self.keypair.public_key)
