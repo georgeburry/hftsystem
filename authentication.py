@@ -8,6 +8,7 @@ load_dotenv()
 def get_dydx_credentials():
     return {
         'host': os.getenv('DYDX_HOST'),
+        'stark_private_key': os.getenv('DYDX_STARK_PRIVATE_KEY'),
         'api_key_credentials': {
             'key': os.getenv('DYDX_KEY'),
             'secret': os.getenv('DYDX_SECRET'),
