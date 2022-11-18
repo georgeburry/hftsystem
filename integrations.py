@@ -11,13 +11,15 @@ from dydx3.constants import (
 
 
 class DydxIntegration:
-    def __init__(self, asset: str, leverage: float = 1.0):
-        self.asset = asset
-        self.market = asset + '-USD'
-        self.leverage = leverage
-
+    def __init__(self, leverage: float = 1.0):
         self.client = create_dydx_connector()
         self.account = self.get_account() 
+        self.asset = os.getenv('ASSET')
+        self.market = self.asset + '-USD'
+        self.leverage = leverage
+
+    def get_market_info(self):
+        return self.client.public.get_markets(self.market).data
 
     def get_orderbook(self):
         return self.client.public.get_orderbook(self.market).data
@@ -79,17 +81,17 @@ class DydxIntegration:
 
 
 class SdexIntegration:
-    def __init__(self, asset: str):
+    def __init__(self):
         issuers = {
             'XLM': None,
             'BTC': 'GDPJALI4AZKUU2W426U5WKMAT6CN3AJRPIIRYR2YM54TL2GDWO5O2MZM',
             'ETH': 'GBFXOHVAS43OIWNIO7XLRJAHT3BICFEIKOJLZVXNT572MISM4CMGSOCC',
             'USDC': 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
         }
-        self.base_asset = Asset(asset, issuer=issuers[asset])
-        self.counter_asset = Asset('USDC', issuer=issuers['USDC'])
-
         self.client, self.keypair = create_sdex_connector()
+        self.base_asset = Asset(os.getenv('ASSET'), issuer=issuers[os.getenv('ASSET')])
+        self.counter_asset = Asset('USDC', issuer=issuers['USDC'])
+        self.price_differential = float(os.getenv('PRICE_DIFFERENTIAL'))
 
     def get_orderbook(self):
         return self.client.orderbook(self.base_asset, self.counter_asset).call()
