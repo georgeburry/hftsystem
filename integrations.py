@@ -1,6 +1,7 @@
 import os
 import time
 from stellar_sdk import Asset, ManageBuyOffer, ManageSellOffer, Network, TransactionBuilder
+from stellar_sdk import exceptions
 from connectors import create_dydx_connector, create_sdex_connector
 from dydx3.constants import (
     ORDER_SIDE_BUY,
@@ -47,9 +48,11 @@ class DydxIntegration:
         return float(self.get_account()['equity'])
 
     def get_open_positions(self):
-        return self.get_account()['openPositions'][self.market]
+        open_positions = self.get_account()['openPositions']
+        return open_positions[self.market] if open_positions else {}
 
     def create_market_buy_order(self, price: float, amount: float):
+        price = round(price // 0.0001 * 0.0001, 4)
         placed_order = self.client.private.create_order(
             position_id=self.account['positionId'],
             market=self.market,
@@ -65,6 +68,7 @@ class DydxIntegration:
         return placed_order
 
     def create_market_sell_order(self, price: float, amount: float):
+        price = round(price // 0.0001 * 0.0001, 4)
         placed_order = self.client.private.create_order(
             position_id=self.account['positionId'],
             market=self.market,
@@ -164,7 +168,10 @@ class SdexIntegration:
             price=price,
             offer_id=offer_id,
         )
-        self.submit_transaction(operation)
+        try:
+            self.submit_transaction(operation)
+        except exceptions.BadRequestError as e:
+            print(e)
 
     def post_sell_order(
         self,
@@ -181,5 +188,8 @@ class SdexIntegration:
             price=price,
             offer_id=offer_id,
         )
-        self.submit_transaction(operation)
+        try:
+            self.submit_transaction(operation)
+        except exceptions.BadRequestError as e:
+            print(e)
 
