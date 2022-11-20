@@ -17,6 +17,9 @@ class DydxIntegration:
         self.account = self.get_account() 
         self.asset = os.getenv('ASSET')
         self.market = self.asset + '-USD'
+        self.min_order_amount = float(os.getenv('MIN_ORDER_AMOUNT'))
+        self.step_size = float(os.getenv('STEP_SIZE'))
+        self.max_slippage = float(os.getenv('MAX_SLIPPAGE'))
         self.leverage = leverage
 
     def get_market_info(self):
@@ -168,10 +171,7 @@ class SdexIntegration:
             price=price,
             offer_id=offer_id,
         )
-        try:
-            self.submit_transaction(operation)
-        except exceptions.BadRequestError as e:
-            print(e)
+        self.submit_transaction(operation)
 
     def post_sell_order(
         self,
@@ -188,8 +188,5 @@ class SdexIntegration:
             price=price,
             offer_id=offer_id,
         )
-        try:
-            self.submit_transaction(operation)
-        except exceptions.BadRequestError as e:
-            print(e)
+        self.submit_transaction(operation)
 

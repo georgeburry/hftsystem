@@ -1,5 +1,13 @@
+import os
+import logging
 from backtesting import launch_backtesting_tool
 from tasks import run_trading_tasks
+
+logging.basicConfig(
+    filename='trading.log',
+    encoding='utf-8',
+    level=int(os.getenv('LOGGING_LEVEL')) or logging.WARNING,
+)
 
 
 if __name__ == '__main__':

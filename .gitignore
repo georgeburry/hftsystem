@@ -3,3 +3,4 @@ venv/
 data/
 celerybeat-schedule.db
 .env
+trading.log
