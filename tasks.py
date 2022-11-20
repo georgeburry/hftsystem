@@ -15,9 +15,12 @@ sdex_integration = SdexIntegration()
 
 def _post_buy_order_if_opportunity():
     buy_offers = sdex_integration.get_buy_offers()
-    bid_sdex = sdex_integration.get_first_bid()
     bid_dydx = dydx_integration.get_first_bid()
-    spread = bid_sdex['price'] / bid_dydx['price'] - 1
+    if sdex_integration.order_type == 'taker':
+        price = sdex_integration.get_first_ask()['price']
+    else:
+        price = sdex_integration.get_first_bid()['price']
+    spread = price / bid_dydx['price'] - 1
 
     if spread < -sdex_integration.price_differential:
         logger.info(f'{time.ctime()} Buying opportunity: the spread is {round(spread * 100, 4)}%')
@@ -28,17 +31,20 @@ def _post_buy_order_if_opportunity():
         offer_id = int(buy_offers[0]['id']) if buy_offers else 0
         if amount >= dydx_integration.min_order_amount:
             logging.warning(f'{time.ctime()} The quote balance is sufficient: Posting a buy order')
-            sdex_integration.post_buy_order(bid_sdex['price'], amount, offer_id)
+            sdex_integration.post_buy_order(price, amount, offer_id)
     elif buy_offers:  # Cancel any outstanding offers by setting amount to 0
         for offer in buy_offers:
-            sdex_integration.post_buy_order(bid_sdex['price'], 0, int(offer['id']))
+            sdex_integration.post_buy_order(price, 0, int(offer['id']))
 
 
 def _post_sell_order_if_opportunity():
     sell_offers = sdex_integration.get_sell_offers()
-    ask_sdex = sdex_integration.get_first_ask()
     ask_dydx = dydx_integration.get_first_ask()
-    spread = ask_sdex['price'] / ask_dydx['price'] - 1
+    if sdex_integration.order_type == 'taker':
+        price = sdex_integration.get_first_bid()['price']
+    else:
+        price = sdex_integration.get_first_ask()['price']
+    spread = price / ask_dydx['price'] - 1
 
     if spread > sdex_integration.price_differential:
         logger.info(f'{time.ctime()} Selling opportunity: the spread is {round(spread * 100, 4)}%')
@@ -49,10 +55,10 @@ def _post_sell_order_if_opportunity():
         offer_id = int(sell_offers[0]['id']) if sell_offers else 0
         if amount >= dydx_integration.min_order_amount:
             logging.warning(f'{time.ctime()} The base balance is sufficient: Posting a sell order')
-            sdex_integration.post_sell_order(ask_sdex['price'], amount, offer_id)
+            sdex_integration.post_sell_order(price, amount, offer_id)
     elif sell_offers:  # Cancel any outstanding offers by setting amount to 0
         for offer in sell_offers:
-            sdex_integration.post_sell_order(ask_sdex['price'], 0, int(offer['id']))
+            sdex_integration.post_sell_order(price, 0, int(offer['id']))
 
 
 def _increase_hedge_position(discrepancy, sdex_balances):

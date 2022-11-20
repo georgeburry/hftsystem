@@ -99,6 +99,7 @@ class SdexIntegration:
         self.base_asset = Asset(os.getenv('ASSET'), issuer=issuers[os.getenv('ASSET')])
         self.counter_asset = Asset('USDC', issuer=issuers['USDC'])
         self.price_differential = float(os.getenv('PRICE_DIFFERENTIAL'))
+        self.order_type = os.getenv('SDEX_ORDER_TYPE')
 
     def get_orderbook(self):
         return self.client.orderbook(self.base_asset, self.counter_asset).call()
