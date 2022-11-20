@@ -4,3 +4,4 @@ data/
 celerybeat-schedule.db
 .env
 trading.log
+results.json

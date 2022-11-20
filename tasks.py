@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 from timeloop import Timeloop
@@ -54,6 +55,55 @@ def _post_sell_order_if_opportunity():
             sdex_integration.post_sell_order(ask_sdex['price'], 0, int(offer['id']))
 
 
+def _increase_hedge_position(discrepancy, sdex_balances):
+    logger.info(f'{time.ctime()} The hedge needs to be increased by {discrepancy} units')
+    bid_dydx = dydx_integration.get_first_bid()
+    order_price = bid_dydx['price'] * (1 - dydx_integration.max_slippage)
+    logger.warning(f'{time.ctime()} Submitting a market sell order to increase hedge')
+    response = dydx_integration.create_market_sell_order(order_price, discrepancy)
+    logger.info(response.data)
+    total_equity = _calculate_total_equity(sdex_balances, bid_dydx['price'])
+    logger.info(f'{time.ctime()} Total equity: {total_equity}')
+    _save_equity_pnl(total_equity)
+    time.sleep(10)
+
+
+def _decrease_hedge_position(discrepancy, sdex_balances):
+    logger.info(f'{time.ctime()} The hedge needs to be decreased by {-discrepancy} units')
+    ask_dydx = dydx_integration.get_first_ask()
+    order_price = ask_dydx['price'] * (1 + dydx_integration.max_slippage)
+    logger.warning(f'{time.ctime()} Submitting a market buy order to decrease hedge')
+    response = dydx_integration.create_market_buy_order(order_price, -discrepancy)
+    logger.info(response.data)
+    total_equity = _calculate_total_equity(sdex_balances, ask_dydx['price'])
+    logger.info(f'{time.ctime()} Total equity: {total_equity}')
+    _save_equity_pnl(total_equity)
+    time.sleep(10)
+
+
+def _calculate_total_equity(sdex_balances, execution_price):
+    sdex_equity = sdex_balances[sdex_integration.base_asset.code] * execution_price + \
+    sdex_balances[sdex_integration.counter_asset.code]
+    dydx_equity = dydx_integration.get_equity()
+    return sdex_equity + dydx_equity
+
+
+def _save_equity_pnl(total_equity, file_name='results.json'):
+    try:
+        with open(file_name, 'r') as f:
+            results = json.load(f)
+    except FileNotFoundError:
+        results = []
+    results.append({
+        'timestamp': int(time.time()),
+        'total_equity': total_equity,
+        'pnl_this_trade': total_equity / results[-1]['total_equity'] - 1 if results else None,
+        'pnl_overall': total_equity / results[0]['total_equity'] - 1 if results else None,
+    })
+    with open(file_name, 'w') as f:
+        json.dump(results, f)
+
+
 @trading_tasks.job(interval=timedelta(seconds=5))
 def run_arbitrage_strategy():
     try:
@@ -72,22 +122,9 @@ def update_hedge():
         discrepancy = sdex_balances[sdex_integration.base_asset.code] + dydx_position
         discrepancy = discrepancy // dydx_integration.step_size * dydx_integration.step_size
         if discrepancy > dydx_integration.min_order_amount * .7:
-            logger.info(f'{time.ctime()} The hedge needs to be increased by {discrepancy} units')
-            bid_dydx = dydx_integration.get_first_bid()
-            price = bid_dydx['price'] * (1 - dydx_integration.max_slippage)
-            logger.warning(f'{time.ctime()} Submitting a market sell order to increase hedge')
-            response = dydx_integration.create_market_sell_order(price, discrepancy)
-            logger.info(response.data)
-            time.sleep(10)
-
+            _increase_hedge_position(discrepancy, sdex_balances)
         elif discrepancy < -dydx_integration.min_order_amount * .7:
-            logger.info(f'{time.ctime()} The hedge needs to be decreased by {-discrepancy} units')
-            ask_dydx = dydx_integration.get_first_ask()
-            price = ask_dydx['price'] * (1 + dydx_integration.max_slippage)
-            logger.warning(f'{time.ctime()} Submitting a market buy order to decrease hedge')
-            response = dydx_integration.create_market_buy_order(price, -discrepancy)
-            logger.info(response.data)
-            time.sleep(10)
+            _decrease_hedge_position(discrepancy, sdex_balances) 
     except Exception as e:
         logging.error(f'{time.ctime()} {e}')
 
