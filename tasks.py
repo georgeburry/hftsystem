@@ -25,7 +25,7 @@ def _post_buy_order_if_opportunity():
     if spread < -sdex_integration.price_differential:
         logger.info(f'{time.ctime()} Buying opportunity: the spread is {round(spread * 100, 4)}%')
         balances = sdex_integration.get_balances()
-        quote_as_base = balances['USDC'] / bid_sdex['price']
+        quote_as_base = balances['USDC'] / price
         total_base = balances[sdex_integration.base_asset.code] + quote_as_base 
         amount = min(quote_as_base * .99, total_base / 10)
         offer_id = int(buy_offers[0]['id']) if buy_offers else 0
@@ -49,7 +49,7 @@ def _post_sell_order_if_opportunity():
     if spread > sdex_integration.price_differential:
         logger.info(f'{time.ctime()} Selling opportunity: the spread is {round(spread * 100, 4)}%')
         balances = sdex_integration.get_balances()
-        quote_as_base = balances['USDC'] / ask_sdex['price']
+        quote_as_base = balances['USDC'] / price
         total_base = balances[sdex_integration.base_asset.code] + quote_as_base 
         amount = min(balances[sdex_integration.base_asset.code] * .99, total_base / 10)
         offer_id = int(sell_offers[0]['id']) if sell_offers else 0
