@@ -60,7 +60,7 @@ def run_arbitrage_strategy():
         _post_buy_order_if_opportunity()
         _post_sell_order_if_opportunity()
     except Exception as e:
-        logger.error(e)
+        logging.error(f'{time.ctime()} {e}')
 
 
 @trading_tasks.job(interval=timedelta(seconds=1))
@@ -89,7 +89,7 @@ def update_hedge():
             logger.info(response.data)
             time.sleep(10)
     except Exception as e:
-        logger.error(e)
+        logging.error(f'{time.ctime()} {e}')
 
 
 def run_trading_tasks():
