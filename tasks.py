@@ -121,9 +121,9 @@ def update_hedge():
         sdex_balances = sdex_integration.get_balances()
         discrepancy = sdex_balances[sdex_integration.base_asset.code] + dydx_position
         discrepancy = discrepancy // dydx_integration.step_size * dydx_integration.step_size
-        if discrepancy > dydx_integration.min_order_amount * .7:
+        if discrepancy > dydx_integration.min_order_amount:
             _increase_hedge_position(discrepancy, sdex_balances)
-        elif discrepancy < -dydx_integration.min_order_amount * .7:
+        elif discrepancy < -dydx_integration.min_order_amount:
             _decrease_hedge_position(discrepancy, sdex_balances) 
     except Exception as e:
         logging.error(f'{time.ctime()} {e}')
