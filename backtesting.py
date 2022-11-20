@@ -231,12 +231,12 @@ def backtest(df):
             ask_price_2 = last_price_2 * 1.001
         if not last_price_1 or not last_price_2:
             continue
-        price_diff_neg = last_price_1 / bid_price_2 - 1  # Hedge market order needs to sell into bids
-        price_diff_pos = last_price_1 / ask_price_2 - 1  # Hedge market order needs to buy into asks
+        price_diff_neg = ask_price_1 / bid_price_2 - 1  # Hedge market order needs to sell into bids
+        price_diff_pos = bid_price_1 / ask_price_2 - 1  # Hedge market order needs to buy into asks
 
         if price_diff_neg and balance_quote and price_diff_neg < price_diff_buy: 
             if not buy_limit_order:
-                buy_limit_order = (bid_price_1, min((balance_quote + balance_base * last_price_1) * .1, balance_quote)) 
+                buy_limit_order = (ask_price_1, min((balance_quote + balance_base * last_price_1) * .1, balance_quote)) 
                 buy_order_created_at = idx
             if isinstance(row['source_1'], list):
                 buy_limit_order, balance_base, balance_quote, balance_perp, short_perp = execute_maker_buy(buy_limit_order, row['source_1'], bid_price_2, balance_base, balance_quote, balance_perp, short_perp)
@@ -247,7 +247,7 @@ def backtest(df):
 
         if price_diff_pos and balance_base and price_diff_pos > price_diff_sell:
             if not sell_limit_order:
-                sell_limit_order = (ask_price_1, min((balance_quote + balance_base * last_price_1) * .1, balance_base * last_price_1)) 
+                sell_limit_order = (bid_price_1, min((balance_quote + balance_base * last_price_1) * .1, balance_base * last_price_1)) 
                 sell_order_created_at = idx
             if isinstance(row['source_1'], list):
                 sell_limit_order, balance_base, balance_quote, balance_perp, short_perp = execute_maker_sell(sell_limit_order, row['source_1'], ask_price_2, balance_base, balance_quote, balance_perp, short_perp)
