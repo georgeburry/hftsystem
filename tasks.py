@@ -77,7 +77,7 @@ def update_hedge():
         print('DYDX rebalance', discrepancy)
         ask_dydx = dydx_integration.get_first_ask()
         price = ask_dydx['price'] * 1.05
-        response = dydx_integration.create_market_buy_order(1000, discrepancy)
+        response = dydx_integration.create_market_buy_order(price, -discrepancy)
         time.sleep(10)
 
 
