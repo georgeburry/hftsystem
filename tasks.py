@@ -12,6 +12,9 @@ trading_tasks = Timeloop()
 dydx_integration = DydxIntegration()
 sdex_integration = SdexIntegration()
 
+dydx_orderbook = dydx_integration.get_orderbook()
+sdex_orderbook = sdex_integration.get_orderbook()
+
 
 def _post_buy_order_if_opportunity():
     buy_offers = sdex_integration.get_buy_offers()
@@ -108,6 +111,13 @@ def _save_equity_pnl(total_equity, file_name='results.json'):
     })
     with open(file_name, 'w') as f:
         json.dump(results, f)
+
+
+@trading_tasks.job(interval=timedelta(seconds=1))
+def get_orderbooks():
+    global dydx_orderbook, sdex_orderbook
+    dydx_orderbook = dydx_integration.get_orderbook()
+    sdex_orderbook = sdex_integration.get_orderbook()
 
 
 @trading_tasks.job(interval=timedelta(seconds=5))
