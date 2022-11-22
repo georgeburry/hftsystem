@@ -17,9 +17,13 @@ def _post_buy_order_if_opportunity():
     buy_offers = sdex_integration.get_buy_offers()
     bid_dydx = dydx_integration.get_first_bid()
     if sdex_integration.order_type == 'taker':
-        price = sdex_integration.get_first_ask()['price']
+        ask_sdex = sdex_integration.get_first_ask()
+        price = ask_sdex['price']
+        amount = ask_sdex['amount']
     else:
-        price = sdex_integration.get_first_bid()['price']
+        bid_sdex = sdex_integration.get_first_bid()
+        price = bid_sdex['price']
+        amount = bid_sdex['amount']
     spread = price / bid_dydx['price'] - 1
 
     if spread < -sdex_integration.price_differential:
@@ -27,7 +31,7 @@ def _post_buy_order_if_opportunity():
         balances = sdex_integration.get_balances()
         quote_as_base = balances['USDC'] / price
         total_base = balances[sdex_integration.base_asset.code] + quote_as_base 
-        amount = min(quote_as_base * .99, total_base / 10)
+        amount = min(amount, quote_as_base * .99, total_base / 10)
         offer_id = int(buy_offers[0]['id']) if buy_offers else 0
         if amount >= dydx_integration.min_order_amount:
             logging.warning(f'{time.ctime()} The quote balance is sufficient: Posting a buy order')
@@ -41,9 +45,13 @@ def _post_sell_order_if_opportunity():
     sell_offers = sdex_integration.get_sell_offers()
     ask_dydx = dydx_integration.get_first_ask()
     if sdex_integration.order_type == 'taker':
-        price = sdex_integration.get_first_bid()['price']
+        bid_sdex = sdex_integration.get_first_bid()
+        price = bid_sdex['price']
+        amount = bid_sdex['amount']
     else:
-        price = sdex_integration.get_first_ask()['price']
+        ask_sdex = sdex_integration.get_first_ask()
+        price = ask_sdex['price']
+        amount = ask_sdex['amount']
     spread = price / ask_dydx['price'] - 1
 
     if spread > sdex_integration.price_differential:
@@ -51,7 +59,7 @@ def _post_sell_order_if_opportunity():
         balances = sdex_integration.get_balances()
         quote_as_base = balances['USDC'] / price
         total_base = balances[sdex_integration.base_asset.code] + quote_as_base 
-        amount = min(balances[sdex_integration.base_asset.code] * .99, total_base / 10)
+        amount = min(amount, balances[sdex_integration.base_asset.code] * .99, total_base / 10)
         offer_id = int(sell_offers[0]['id']) if sell_offers else 0
         if amount >= dydx_integration.min_order_amount:
             logging.warning(f'{time.ctime()} The base balance is sufficient: Posting a sell order')
