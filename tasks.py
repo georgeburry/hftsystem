@@ -12,25 +12,61 @@ trading_tasks = Timeloop()
 dydx_integration = DydxIntegration()
 sdex_integration = SdexIntegration()
 
+liquidity = 0
+
+
+def _calculate_spread(price_1: float, price_2: float):
+    return price_1 / price_2 - 1
+
+
+def _get_order_levels(side: str, order_type: str):
+    orderbook = sdex_integration.get_orderbook()
+    if (side == 'buy' and order_type == 'taker') or (side == 'sell' and order_type == 'maker'):
+        return [
+            {
+                'price': float(ask['price']),
+                'amount': float(ask['amount']),
+            } for ask in orderbook['asks']
+        ]
+    elif (side == 'buy' and order_type == 'maker') or (side == 'sell' and order_type == 'taker'):
+        return [
+            {
+                'price': float(bid['price']),
+                'amount': float(bid['amount']),
+            } for bid in orderbook['bids']
+        ]
+
+
+def _get_best_price_amount(side: str, price_2: float):
+    price, amount = 0, 0
+    order_levels = _get_order_levels(side, sdex_integration.order_type)
+    for level in order_levels:
+        spread = _calculate_spread(level['price'], price_2)
+        if (
+            side == 'buy' and spread < -sdex_integration.price_differential
+            or side == 'sell' and spread > sdex_integration.price_differential
+        ):
+            price = level['price']
+            if sdex_integration.order_type == 'maker':
+                return level['price'], 1e9
+            amount += level['amount']
+        else:
+            break
+    return price, amount
+
 
 def _post_buy_order_if_opportunity():
+    global liquidity
     buy_offers = sdex_integration.get_buy_offers()
     bid_dydx = dydx_integration.get_first_bid()
-    if sdex_integration.order_type == 'taker':
-        ask_sdex = sdex_integration.get_first_ask()
-        price = ask_sdex['price']
-        amount = ask_sdex['amount']
-    else:
-        bid_sdex = sdex_integration.get_first_bid()
-        price = bid_sdex['price']
-        amount = bid_sdex['amount']
-    spread = price / bid_dydx['price'] - 1
-
-    if spread < -sdex_integration.price_differential:
+    price, amount = _get_best_price_amount('buy', bid_dydx['price'])
+    if price and amount:
+        spread = _calculate_spread(price, bid_dydx['price'])
         logger.info(f'{time.ctime()} Buying opportunity: the spread is {round(spread * 100, 4)}%')
         balances = sdex_integration.get_balances()
         quote_as_base = balances['USDC'] / price
         total_base = balances[sdex_integration.base_asset.code] + quote_as_base 
+        liquidity = min(bid_dydx['amount'], amount)  # Update liquidity for use in record keeping
         amount = min(amount, quote_as_base * .99, total_base / 10)
         offer_id = int(buy_offers[0]['id']) if buy_offers else 0
         if amount >= dydx_integration.min_order_amount:
@@ -42,23 +78,17 @@ def _post_buy_order_if_opportunity():
 
 
 def _post_sell_order_if_opportunity():
+    global liquidity
     sell_offers = sdex_integration.get_sell_offers()
     ask_dydx = dydx_integration.get_first_ask()
-    if sdex_integration.order_type == 'taker':
-        bid_sdex = sdex_integration.get_first_bid()
-        price = bid_sdex['price']
-        amount = bid_sdex['amount']
-    else:
-        ask_sdex = sdex_integration.get_first_ask()
-        price = ask_sdex['price']
-        amount = ask_sdex['amount']
-    spread = price / ask_dydx['price'] - 1
-
-    if spread > sdex_integration.price_differential:
+    price, amount = _get_best_price_amount('sell', ask_dydx['price'])
+    if price and amount:
+        spread = _calculate_spread(price, ask_dydx['price'])
         logger.info(f'{time.ctime()} Selling opportunity: the spread is {round(spread * 100, 4)}%')
         balances = sdex_integration.get_balances()
         quote_as_base = balances['USDC'] / price
         total_base = balances[sdex_integration.base_asset.code] + quote_as_base 
+        liquidity = min(ask_dydx['amount'], amount)  # Update liquidity for use in record keeping
         amount = min(amount, balances[sdex_integration.base_asset.code] * .99, total_base / 10)
         offer_id = int(sell_offers[0]['id']) if sell_offers else 0
         if amount >= dydx_integration.min_order_amount:
@@ -76,10 +106,10 @@ def _increase_hedge_position(discrepancy, sdex_balances):
     logger.warning(f'{time.ctime()} Submitting a market sell order to increase hedge')
     response = dydx_integration.create_market_sell_order(order_price, discrepancy)
     logger.info(response.data)
-    total_equity = _calculate_total_equity(sdex_balances, bid_dydx['price'])
+    total_equity = _calculate_total_equity(sdex_balances)
     logger.info(f'{time.ctime()} Total equity: {total_equity}')
     _save_equity_pnl(total_equity)
-    time.sleep(10)
+    time.sleep(5)
 
 
 def _decrease_hedge_position(discrepancy, sdex_balances):
@@ -89,14 +119,15 @@ def _decrease_hedge_position(discrepancy, sdex_balances):
     logger.warning(f'{time.ctime()} Submitting a market buy order to decrease hedge')
     response = dydx_integration.create_market_buy_order(order_price, -discrepancy)
     logger.info(response.data)
-    total_equity = _calculate_total_equity(sdex_balances, ask_dydx['price'])
+    total_equity = _calculate_total_equity(sdex_balances)
     logger.info(f'{time.ctime()} Total equity: {total_equity}')
     _save_equity_pnl(total_equity)
-    time.sleep(10)
+    time.sleep(5)
 
 
-def _calculate_total_equity(sdex_balances, execution_price):
-    sdex_equity = sdex_balances[sdex_integration.base_asset.code] * execution_price + \
+def _calculate_total_equity(sdex_balances):
+    sdex_price = sdex_integration.get_midmarket_price()
+    sdex_equity = sdex_balances[sdex_integration.base_asset.code] * sdex_price + \
     sdex_balances[sdex_integration.counter_asset.code]
     dydx_equity = dydx_integration.get_equity()
     return sdex_equity + dydx_equity
@@ -111,6 +142,9 @@ def _save_equity_pnl(total_equity, file_name='results.json'):
     results.append({
         'timestamp': int(time.time()),
         'total_equity': total_equity,
+        'liquidity': liquidity,
+        'sdex_last_trade': sdex_integration.get_last_trade(),
+        'dydx_last_trade': dydx_integration.get_last_trade(),
         'pnl_this_trade': total_equity / results[-1]['total_equity'] - 1 if results else None,
         'pnl_overall': total_equity / results[0]['total_equity'] - 1 if results else None,
     })
