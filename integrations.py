@@ -54,6 +54,17 @@ class DydxIntegration:
         open_positions = self.get_account()['openPositions']
         return open_positions[self.market] if open_positions else {}
 
+    def get_last_trade(self):
+        trades = self.client.private.get_fills(market=self.market, limit=1).data['fills']
+        if not trades:
+            return {}
+        return {
+            'time': trades[0]['createdAt'],
+            'side': trades[0]['side'],
+            'price': float(trades[0]['price']),
+            'amount': float(trades[0]['size']),
+        }
+
     def create_market_buy_order(self, price: float, amount: float):
         price = round(price // 0.0001 * 0.0001, 4)
         placed_order = self.client.private.create_order(
@@ -104,6 +115,10 @@ class SdexIntegration:
     def get_orderbook(self):
         return self.client.orderbook(self.base_asset, self.counter_asset).call()
 
+    def get_midmarket_price(self):
+        orderbook = self.get_orderbook()
+        return (float(orderbook['bids'][0]['price']) + float(orderbook['asks'][0]['price'])) / 2
+
     def get_first_bid(self):
         orderbook = self.get_orderbook()
         return {
@@ -123,7 +138,7 @@ class SdexIntegration:
 
     def get_balances(self):
         balances = self.get_account().raw_data['balances']
-        reserve = 1.5 + (len(balances) - 1) * .5 + .5  # Assuming an order is open
+        reserve = 1.5 + (len(balances) - 1) * .5 + .5  # .5 x 1 order
         native_balance = {
             'XLM': max(float(b['balance']) - reserve, 0) for b in balances
             if b['asset_type'] == 'native'
@@ -145,6 +160,21 @@ class SdexIntegration:
         sell_offers = offers.for_buying(self.counter_asset).call()
         sell_offers = sell_offers['_embedded']['records']
         return sell_offers
+
+    def get_last_trade(self):
+        trades = self.client.trades()\
+            .for_account(self.keypair.public_key)\
+            .for_asset_pair(self.base_asset, self.counter_asset)\
+            .order(desc=True)\
+            .call()['_embedded']['records']
+        if not trades:
+            return {}
+        return {
+            'time': trades[0]['ledger_close_time'],
+            'side': 'BUY' if trades[0]['base_is_seller'] == 'True' else 'SELL',
+            'price': float(trades[0]['price']['n']) / float(trades[0]['price']['d']),
+            'amount': float(trades[0]['base_amount']),
+        }
 
     def submit_transaction(self, operation):
         transaction = TransactionBuilder(
