@@ -74,7 +74,7 @@ def _post_buy_order_if_opportunity():
             sdex_integration.post_buy_order(price, amount, offer_id)
     elif buy_offers:  # Cancel any outstanding offers by setting amount to 0
         for offer in buy_offers:
-            sdex_integration.post_buy_order(price, 0, int(offer['id']))
+            sdex_integration.post_buy_order(1, 0, int(offer['id']))
 
 
 def _post_sell_order_if_opportunity():
@@ -96,7 +96,7 @@ def _post_sell_order_if_opportunity():
             sdex_integration.post_sell_order(price, amount, offer_id)
     elif sell_offers:  # Cancel any outstanding offers by setting amount to 0
         for offer in sell_offers:
-            sdex_integration.post_sell_order(price, 0, int(offer['id']))
+            sdex_integration.post_sell_order(1, 0, int(offer['id']))
 
 
 def _increase_hedge_position(discrepancy, sdex_balances):
