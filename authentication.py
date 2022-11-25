@@ -5,6 +5,13 @@ from stellar_sdk import Keypair
 load_dotenv()
 
 
+def get_binance_credentials():
+    return {
+        'api_key': os.getenv('BINANCE_API_KEY'),
+        'api_secret': os.getenv('BINANCE_API_SECRET'),
+    }
+
+
 def get_dydx_credentials():
     return {
         'host': os.getenv('DYDX_HOST'),

@@ -1,14 +1,104 @@
 import os
 import time
+from datetime import datetime
 from stellar_sdk import Asset, ManageBuyOffer, ManageSellOffer, Network, TransactionBuilder
 from stellar_sdk import exceptions
-from connectors import create_dydx_connector, create_sdex_connector
+from connectors import create_binance_connector, create_dydx_connector, create_sdex_connector
 from dydx3.constants import (
     ORDER_SIDE_BUY,
     ORDER_SIDE_SELL,
     ORDER_TYPE_MARKET,
     TIME_IN_FORCE_FOK,
 )
+
+
+class BinanceIntegration:
+    def __init__(self):
+        self.client = create_binance_connector()
+        self.account = self.get_account()
+        self.asset = os.getenv('ASSET')
+        self.other_assets = os.getenv('OTHER_ASSETS').split(',') if os.getenv('OTHER_ASSETS') else []
+
+    def get_all_tickers(self):
+        return self.client.get_all_tickers()
+
+    def get_orderbook(self):
+        return self.client.get_order_book(symbol=self.asset + 'BUSD')
+
+    def get_midmarket_price(self):
+        orderbook = self.get_orderbook()
+        return (float(orderbook['bids'][0][0]) + float(orderbook['asks'][0][0])) / 2
+
+    def get_account(self):
+        return self.client.get_account()
+
+    def get_total_balance(self):
+        balances = self.get_account()['balances']
+        balances = [
+            balance for balance in balances
+            if balance['asset'] in [self.asset, 'BUSD'] + self.other_assets
+        ]
+        tickers = self.get_all_tickers()
+        total_balance = 0
+        for balance in balances:
+            if balance['asset'] != 'BUSD':
+                price = float([
+                    ticker for ticker in tickers
+                    if ticker['symbol'] == balance['asset'] + 'BUSD'
+                ][0]['price'])
+            else:
+                price = 1
+            total_balance += float(balance['free']) * price + float(balance['locked']) * price
+        return total_balance
+
+    def get_asset_balance(self, asset: str):
+        return self.client.get_asset_balance(asset=asset)
+
+    def get_total_base_balance(self):
+        response = self.get_asset_balance(self.asset)
+        return float(response['free']) + float(response['locked'])
+
+    def get_total_quote_balance(self):
+        response = self.get_asset_balance('BUSD')
+        return float(response['free']) + float(response['locked'])
+
+    def get_free_base_balance(self):
+        return float(self.get_asset_balance(self.asset)['free'])
+
+    def get_free_quote_balance(self):
+        return float(self.get_asset_balance('BUSD')['free'])
+
+    def get_free_balances(self):
+        # {'asset': 'BTC', 'free': '0.00000000', 'locked': '0.00000000'}
+        base_asset = self.client.get_asset_balance(asset=self.asset)
+        quote_asset = self.client.get_asset_balance(asset='BUSD')
+        return {
+            self.asset: float(base_asset['free']),
+            'BUSD': float(quote_asset['free']),
+        }
+
+    def get_last_trade(self):
+        trades = self.client.get_my_trades(symbol=self.asset + 'BUSD')
+        if not trades:
+            return {}
+        return {
+            'time': datetime.fromtimestamp(trades[-1]['time'] / 1000).isoformat(),
+            'side': 'BUY' if trades[-1]['isBuyer'] else 'SELL',
+            'price': float(trades[-1]['price']),
+            'amount': float(trades[-1]['qty']),
+        }
+
+    def create_market_buy_order(self, quantity):
+        return self.client.order_market_buy(
+            symbol=self.asset + 'BUSD',
+            quantity=quantity,
+        )
+
+    def create_market_sell_order(self, quantity):
+        return self.client.order_market_sell(
+            symbol=self.asset + 'BUSD',
+            quantity=quantity,
+        )
 
 
 class DydxIntegration:
