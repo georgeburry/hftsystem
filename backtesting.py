@@ -72,16 +72,18 @@ def pull_sdex_data(market: str, start_date: str, end_date: str):
 
 
 def pull_binance_data(market: str, start_date: str):
-    symbol = market.replace('-', '')
     start_time = int(datetime.strptime(start_date, '%Y-%m-%d').timestamp()) * 1000
     client = Client()
-    results = client.get_aggregate_trades(symbol=symbol, startTime=start_time, endTime=start_time + 3600000, limit=1000)
+    results = client.get_aggregate_trades(symbol=market, startTime=start_time, endTime=start_time + 3600000, limit=1000)
     aggregate_id = results[-1]['a']
     timestamp_last = 0
     timestamp_now = datetime.now().timestamp() * 1000
     while timestamp_last < timestamp_now:
-        r = client.get_aggregate_trades(symbol='XLMUSDT', fromId=aggregate_id, limit=1000)
-        time.sleep(1)
+        time_before = time.time()
+        r = client.get_aggregate_trades(symbol=market, fromId=aggregate_id, limit=1000)
+        sleep_time = .05 - (time.time() - time_before)
+        if sleep_time > 0:
+            time.sleep(sleep_time)
         results.pop()
         print('latest time', datetime.fromtimestamp(int(r[-1]['T']) / 1000))
         print('last id', results[-1]['a'], 'next id', r[0]['a'])
@@ -209,8 +211,8 @@ def backtest(df):
     balance_base = 0
     balance_perp = balance_quote
     short_perp = 0
-    buy_limit_order = None
-    sell_limit_order = None
+    buy_order = None
+    sell_order = None
     price_diff_buy = float(input('Set the price difference at which to buy (default: -0.0025) [< 0]: ') or -.0025)
     price_diff_sell = float(input('Set the price difference at which to sell (default: 0.0025) [>= 0]: ') or .0025)
     last_price_1 = last_price_2 = bid_price_1 = ask_price_1 = None
@@ -231,38 +233,30 @@ def backtest(df):
             ask_price_2 = last_price_2 * 1.001
         if not last_price_1 or not last_price_2:
             continue
-        price_diff_neg = last_price_1 / bid_price_2 - 1  # Hedge market order needs to sell into bids
-        price_diff_pos = last_price_1 / ask_price_2 - 1  # Hedge market order needs to buy into asks
+        price_diff_neg = ask_price_1 / bid_price_2 - 1  # Hedge market order needs to sell into bids
+        price_diff_pos = bid_price_1 / ask_price_2 - 1  # Hedge market order needs to buy into asks
 
         if price_diff_neg and balance_quote and price_diff_neg < price_diff_buy: 
-            if not buy_limit_order:
-                buy_limit_order = (bid_price_1, min((balance_quote + balance_base * last_price_1) * .1, balance_quote)) 
+            if not buy_order:
+                buy_order = (ask_price_1, min((balance_quote + balance_base * last_price_1) * .1, balance_quote))
                 buy_order_created_at = idx
             if isinstance(row['source_1'], list):
-                buy_limit_order, balance_base, balance_quote, balance_perp, short_perp = execute_maker_buy(buy_limit_order, row['source_1'], bid_price_2, balance_base, balance_quote, balance_perp, short_perp)
-                if buy_limit_order and not buy_limit_order[1]:
-                    buy_limit_order = None
+                buy_order, balance_base, balance_quote, balance_perp, short_perp = execute_maker_buy(buy_order, row['source_1'], bid_price_2, balance_base, balance_quote, balance_perp, short_perp)
+                if buy_order and not buy_order[1]:
+                    buy_order = None
         else:
-            buy_limit_order = None    
+            buy_order = None
 
         if price_diff_pos and balance_base and price_diff_pos > price_diff_sell:
-            if not sell_limit_order:
-                sell_limit_order = (ask_price_1, min((balance_quote + balance_base * last_price_1) * .1, balance_base * last_price_1)) 
+            if not sell_order:
+                sell_order = (bid_price_1, min((balance_quote + balance_base * last_price_1) * .1, balance_base * last_price_1))
                 sell_order_created_at = idx
             if isinstance(row['source_1'], list):
-                sell_limit_order, balance_base, balance_quote, balance_perp, short_perp = execute_maker_sell(sell_limit_order, row['source_1'], ask_price_2, balance_base, balance_quote, balance_perp, short_perp)
-                if sell_limit_order and not sell_limit_order[1]:
-                    sell_limit_order = None
+                sell_order, balance_base, balance_quote, balance_perp, short_perp = execute_maker_sell(sell_order, row['source_1'], ask_price_2, balance_base, balance_quote, balance_perp, short_perp)
+                if sell_order and not sell_order[1]:
+                    sell_order = None
         else:
-            sell_limit_order = None
-
-        if buy_limit_order and idx - buy_order_created_at > 60:
-            buy_limit_order = (bid_price_1, buy_limit_order[1])
-            buy_order_created_at = idx
-
-        if sell_limit_order and idx - sell_order_created_at > 60:
-            sell_limit_order = (ask_price_1, sell_limit_order[1])
-            sell_order_created_at = idx
+            sell_order = None
 
         if count % 1000 == 0:
             balance_records.append((idx, balance_quote + balance_base * last_price_1 + balance_perp + short_perp * last_price_2))
@@ -280,8 +274,8 @@ def plot_results(results):
 def launch_backtesting_tool():
     operation = input('(F)etch trades history or (B)acktest? ')
     if operation.lower() == 'b':
-        source_path_1 = 'data/sdex-XLM-USDC-2022-11-13T17:42:44.293342.json'  # input('What is the path of source #1? ')
-        source_path_2 = 'data/dydx-XLM-USD-2022-11-15T17:02:03.426323.json'  # input('What is the path of source #2? ')
+        source_path_1 = 'data/' + input('What is the path of source #1? ')
+        source_path_2 = 'data/' + input('What is the path of source #2? ')
         df = create_df(source_path_1, source_path_2)
         backtest(df)
     elif operation.lower() == 'f':
@@ -294,7 +288,7 @@ def launch_backtesting_tool():
             data = pull_sdex_data(market, start_date, end_date)
             data = transform_sdex_data(data)
         elif venue == 'binance':
-            market += 'T'
+            market = market.split('-')[0] + 'BUSD'
             data = pull_binance_data(market, start_date)
             data = transform_binance_data(data)
         elif venue == 'dydx':
