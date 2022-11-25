@@ -11,7 +11,7 @@ logging.basicConfig(
 
 
 if __name__ == '__main__':
-    operation = input('Select an operation to run:\n\nA) Run trading system\nB) Run backtesting tool\n')
+    operation = input('Select an operation to run:\n\nA) Run trading system\nB) Run backtesting tool\n\n')
     if operation.upper() == 'A':
         run_trading_tasks()
     elif operation.upper() == 'B':

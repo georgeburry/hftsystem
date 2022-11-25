@@ -3,15 +3,17 @@ import logging
 import time
 from timeloop import Timeloop
 from datetime import datetime, timedelta
-from integrations import DydxIntegration, SdexIntegration
+from integrations import BinanceIntegration, DydxIntegration, SdexIntegration
 
 logger = logging.getLogger(__name__)
 
 trading_tasks = Timeloop()
 
+binance_integration = BinanceIntegration()
 dydx_integration = DydxIntegration()
 sdex_integration = SdexIntegration()
 
+venue = None
 liquidity = 0
 user = None
 dydx_trailing_volume = 0
@@ -22,19 +24,22 @@ def _calculate_spread(price_1: float, price_2: float):
 
 
 def _get_order_levels(side: str, order_type: str):
-    orderbook = sdex_integration.get_orderbook()
+    if venue == 'binance':
+        orderbook = binance_integration.get_orderbook()
+    elif venue == 'sdex':
+        orderbook = sdex_integration.get_orderbook()
     if (side == 'buy' and order_type == 'taker') or (side == 'sell' and order_type == 'maker'):
         return [
             {
-                'price': float(ask['price']),
-                'amount': float(ask['amount']),
+                'price': float(ask[0] if venue == 'binance' else ask['price']),
+                'amount': float(ask[1] if venue == 'binance' else ask['amount']),
             } for ask in orderbook['asks']
         ]
     elif (side == 'buy' and order_type == 'maker') or (side == 'sell' and order_type == 'taker'):
         return [
             {
-                'price': float(bid['price']),
-                'amount': float(bid['amount']),
+                'price': float(bid[0] if venue == 'binance' else bid['price']),
+                'amount': float(bid[1] if venue == 'binance' else bid['amount']),
             } for bid in orderbook['bids']
         ]
 
@@ -57,7 +62,49 @@ def _get_best_price_amount(side: str, price_2: float):
     return price, amount
 
 
-def _post_buy_order_if_opportunity():
+def _binance_buy_if_opportunity():
+    global liquidity
+    buy_orders = binance_integration.get_open_orders(side='BUY')
+    bid_dydx = dydx_integration.get_first_bid()
+    price, amount = _get_best_price_amount('buy', bid_dydx['price'])
+    if price and amount:
+        balances = binance_integration.get_free_balances()
+        quote_as_base = balances['quote'] / price
+        total_base = balances['base'] + quote_as_base
+        liquidity = min(bid_dydx['amount'], amount)  # Update liquidity for use in record keeping
+        dp = len(str(amount).split('.')[1])
+        amount = round(min(amount, quote_as_base * .99, total_base / 10), dp)
+        if amount > dydx_integration.min_order_amount:
+            spread = round(_calculate_spread(price, bid_dydx['price']) * 100, 4)
+            logger.warning(f'{time.ctime()} SDEX Spread: {spread}% - Buying {amount} units @ price: {price}')
+            response = binance_integration.create_market_buy_order(amount)
+            logger.info(response)
+    elif buy_offers:
+        for order in buy_orders:
+            binance_integration.cancel_order(order['orderId'])
+
+def _binance_sell_if_opportunity():
+    global liquidity
+    sell_orders = binance_integration.get_open_orders(side='SELL')
+    ask_dydx = dydx_integration.get_first_ask()
+    price, amount = _get_best_price_amount('sell', ask_dydx['price'])
+    if price and amount:
+        balances = binance_integration.get_free_balances()
+        quote_as_base = balances['quote'] / price
+        total_base = balances['base'] + quote_as_base
+        liquidity = min(ask_dydx['amount'], amount)  # Update liquidity for use in record keeping
+        dp = len(str(amount).split('.')[1])
+        amount = round(min(amount, balances['base'] * .99, total_base / 10), dp)
+        if amount > dydx_integration.min_order_amount:
+            spread = round(_calculate_spread(price, ask_dydx['price']) * 100, 4)
+            logger.warning(f'{time.ctime()} SDEX Spread: {spread}% - Selling {amount} units @ price: {price}')
+            response = binance_integration.create_market_sell_order(amount)
+            logger.info(response)
+    elif sell_offers:
+        for order in sell_orders:
+            binance_integration.cancel_order(order['orderId'])
+
+def _sdex_buy_if_opportunity():
     global liquidity
     buy_offers = sdex_integration.get_buy_offers()
     bid_dydx = dydx_integration.get_first_bid()
@@ -70,7 +117,7 @@ def _post_buy_order_if_opportunity():
         amount = min(amount, quote_as_base * .99, total_base / 10)
         if amount > dydx_integration.min_order_amount:
             spread = round(_calculate_spread(price, bid_dydx['price']) * 100, 4)
-            logger.info(f'{time.ctime()} SDEX Spread: {spread}% - Buying {amount} units @ price: {price}')
+            logger.warning(f'{time.ctime()} SDEX Spread: {spread}% - Buying {amount} units @ price: {price}')
             offer_id = int(buy_offers[0]['id']) if buy_offers else 0
             sdex_integration.post_buy_order(price, amount, offer_id)
     elif buy_offers:  # Cancel any outstanding offers by setting amount to 0
@@ -78,7 +125,7 @@ def _post_buy_order_if_opportunity():
             sdex_integration.post_buy_order(1, 0, int(offer['id']))
 
 
-def _post_sell_order_if_opportunity():
+def _sdex_sell_if_opportunity():
     global liquidity
     sell_offers = sdex_integration.get_sell_offers()
     ask_dydx = dydx_integration.get_first_ask()
@@ -91,7 +138,7 @@ def _post_sell_order_if_opportunity():
         amount = min(amount, balances[sdex_integration.base_asset.code] * .99, total_base / 10)
         if amount > dydx_integration.min_order_amount:
             spread = round(_calculate_spread(price, ask_dydx['price']) * 100, 4)
-            logger.info(f'{time.ctime()} SDEX Spread: {spread}% - Selling {amount} units @ price: {price}')
+            logger.warning(f'{time.ctime()} SDEX Spread: {spread}% - Selling {amount} units @ price: {price}')
             offer_id = int(sell_offers[0]['id']) if sell_offers else 0
             sdex_integration.post_sell_order(price, amount, offer_id)
     elif sell_offers:  # Cancel any outstanding offers by setting amount to 0
@@ -99,38 +146,41 @@ def _post_sell_order_if_opportunity():
             sdex_integration.post_sell_order(1, 0, int(offer['id']))
 
 
-def _increase_hedge_position(discrepancy, sdex_balances):
+def _increase_hedge_position(discrepancy, balances):
     logger.info(f'{time.ctime()} The hedge needs to be increased by {discrepancy} units')
     bid_dydx = dydx_integration.get_first_bid()
     order_price = bid_dydx['price'] * (1 - dydx_integration.max_slippage)
     logger.warning(f'{time.ctime()} Submitting a market sell order to increase hedge')
     response = dydx_integration.create_market_sell_order(order_price, discrepancy)
     logger.info(response.data)
-    total_equity = _calculate_total_equity(sdex_balances)
+    total_equity = _calculate_total_equity(balances)
     logger.info(f'{time.ctime()} Total equity: {total_equity}')
     _save_equity_pnl(total_equity)
     time.sleep(5)
 
 
-def _decrease_hedge_position(discrepancy, sdex_balances):
+def _decrease_hedge_position(discrepancy, balances):
     logger.info(f'{time.ctime()} The hedge needs to be decreased by {-discrepancy} units')
     ask_dydx = dydx_integration.get_first_ask()
     order_price = ask_dydx['price'] * (1 + dydx_integration.max_slippage)
     logger.warning(f'{time.ctime()} Submitting a market buy order to decrease hedge')
     response = dydx_integration.create_market_buy_order(order_price, -discrepancy)
     logger.info(response.data)
-    total_equity = _calculate_total_equity(sdex_balances)
+    total_equity = _calculate_total_equity(balances)
     logger.info(f'{time.ctime()} Total equity: {total_equity}')
     _save_equity_pnl(total_equity)
     time.sleep(5)
 
 
-def _calculate_total_equity(sdex_balances):
-    sdex_price = sdex_integration.get_midmarket_price()
-    sdex_equity = sdex_balances[sdex_integration.base_asset.code] * sdex_price + \
-    sdex_balances[sdex_integration.counter_asset.code]
+def _calculate_total_equity(balances):
+    if venue == 'binance':
+        venue_a_price = binance_integration.get_midmarket_price()
+    elif venue == 'sdex':
+        venue_a_price = sdex_integration.get_midmarket_price()
+    venue_a_equity = balances['base'] * venue_a_price + \
+    balances['quote']
     dydx_equity = dydx_integration.get_equity()
-    return sdex_equity + dydx_equity
+    return venue_a_equity + dydx_equity
 
 
 def _save_equity_pnl(total_equity, file_name='results.json'):
@@ -139,11 +189,15 @@ def _save_equity_pnl(total_equity, file_name='results.json'):
             results = json.load(f)
     except FileNotFoundError:
         results = []
+    if venue == 'binance':
+        venue_a_last_trade = binance_integration.get_last_trade()
+    elif venue == 'sdex':
+        venue_a_last_trade = sdex_integration.get_last_trade()
     results.append({
         'timestamp': int(time.time()),
         'total_equity': total_equity,
         'liquidity': liquidity,
-        'sdex_last_trade': sdex_integration.get_last_trade(),
+        'venue_a_last_trade': venue_a_last_trade,
         'dydx_last_trade': dydx_integration.get_last_trade(),
         'pnl_this_trade': total_equity / results[-1]['total_equity'] - 1 if results else None,
         'pnl_overall': total_equity / results[0]['total_equity'] - 1 if results else None,
@@ -157,9 +211,12 @@ def run_arbitrage_strategy():
     try:
         if dydx_trailing_volume > 100000:
             logger.warning('Trading halted! User: {user["publicId"]} DYDX 30D trailing volume has exceeded 100,000 USD')
-        else:
-            _post_buy_order_if_opportunity()
-            _post_sell_order_if_opportunity()
+        elif venue == 'binance':
+            _binance_buy_if_opportunity()
+            _binance_sell_if_opportunity()
+        elif venue == 'sdex':
+            _sdex_buy_if_opportunity()
+            _sdex_sell_if_opportunity()
     except Exception as e:
         logger.error(f'{time.ctime()} {e}')
 
@@ -170,13 +227,20 @@ def update_hedge():
         global user, dydx_trailing_volume
         dydx_position = dydx_integration.get_open_positions()
         dydx_position = float(dydx_position['size']) if dydx_position else 0
-        sdex_balances = sdex_integration.get_balances()
-        discrepancy = sdex_balances[sdex_integration.base_asset.code] + dydx_position
+        if venue == 'binance':
+            balances = binance_integration.get_total_balances()
+        elif venue == 'sdex':
+            balances = sdex_integration.get_balances()
+            balances = {
+                'base': balances[sdex_integration.base_asset.code],
+                'quote': balances[sdex_integration.counter_asset.code],
+            }
+        discrepancy = balances['base'] + dydx_position
         discrepancy = discrepancy // dydx_integration.step_size * dydx_integration.step_size
         if discrepancy > dydx_integration.min_order_amount:
-            _increase_hedge_position(discrepancy, sdex_balances)
+            _increase_hedge_position(discrepancy, balances)
         elif discrepancy < -dydx_integration.min_order_amount:
-            _decrease_hedge_position(discrepancy, sdex_balances) 
+            _decrease_hedge_position(discrepancy, balances)
         user = dydx_integration.get_user()
         dydx_trailing_volume = float(user['makerVolume30D']) + float(user['takerVolume30D'])
     except Exception as e:
@@ -184,5 +248,8 @@ def update_hedge():
 
 
 def run_trading_tasks():
+    global venue
+    venue_input = input('Select the venue:\n\nA) Binance\nB) SDEX\n\n')
+    venue = {'A': 'binance', 'B': 'sdex'}.get(venue_input.upper())
     trading_tasks.start(block=True)
 

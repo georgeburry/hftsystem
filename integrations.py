@@ -32,7 +32,7 @@ class BinanceIntegration:
     def get_account(self):
         return self.client.get_account()
 
-    def get_total_balance(self):
+    def get_account_balance(self):
         balances = self.get_account()['balances']
         balances = [
             balance for balance in balances
@@ -69,13 +69,26 @@ class BinanceIntegration:
         return float(self.get_asset_balance('BUSD')['free'])
 
     def get_free_balances(self):
-        # {'asset': 'BTC', 'free': '0.00000000', 'locked': '0.00000000'}
         base_asset = self.client.get_asset_balance(asset=self.asset)
         quote_asset = self.client.get_asset_balance(asset='BUSD')
         return {
-            self.asset: float(base_asset['free']),
-            'BUSD': float(quote_asset['free']),
+            'base': float(base_asset['free']),
+            'quote': float(quote_asset['free']),
         }
+
+    def get_total_balances(self):
+        base_asset = self.client.get_asset_balance(asset=self.asset)
+        quote_asset = self.client.get_asset_balance(asset='BUSD')
+        return {
+            'base': float(base_asset['free']) + float(base_asset['locked']),
+            'quote': float(quote_asset['free']) + float(quote_asset['locked']),
+        }
+
+    def get_open_orders(self, side=None):
+        orders = self.client.get_open_orders(symbol=self.asset + 'BUSD')
+        if side:
+            orders = [order for order in orders if order['side'] == side.upper()]
+        return orders
 
     def get_last_trade(self):
         trades = self.client.get_my_trades(symbol=self.asset + 'BUSD')
@@ -98,6 +111,12 @@ class BinanceIntegration:
         return self.client.order_market_sell(
             symbol=self.asset + 'BUSD',
             quantity=quantity,
+        )
+
+    def cancel_order(self, order_id):
+        return self.client.cancel_order(
+            symbol=self.asset + 'BUSD',
+            orderId=order_id,
         )
 
 
