@@ -171,7 +171,7 @@ class SdexIntegration:
             return {}
         return {
             'time': trades[0]['ledger_close_time'],
-            'side': 'BUY' if trades[0]['base_is_seller'] == 'True' else 'SELL',
+            'side': 'BUY' if trades[0]['base_is_seller'] else 'SELL',
             'price': float(trades[0]['price']['n']) / float(trades[0]['price']['d']),
             'amount': float(trades[0]['base_amount']),
         }
