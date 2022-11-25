@@ -68,7 +68,7 @@ def _post_buy_order_if_opportunity():
         total_base = balances[sdex_integration.base_asset.code] + quote_as_base 
         liquidity = min(bid_dydx['amount'], amount)  # Update liquidity for use in record keeping
         amount = min(amount, quote_as_base * .99, total_base / 10)
-        if amount:
+        if amount > dydx_integration.min_order_amount:
             spread = round(_calculate_spread(price, bid_dydx['price']) * 100, 4)
             logger.info(f'{time.ctime()} SDEX Spread: {spread}% - Buying {amount} units @ price: {price}')
             offer_id = int(buy_offers[0]['id']) if buy_offers else 0
@@ -89,7 +89,7 @@ def _post_sell_order_if_opportunity():
         total_base = balances[sdex_integration.base_asset.code] + quote_as_base 
         liquidity = min(ask_dydx['amount'], amount)  # Update liquidity for use in record keeping
         amount = min(amount, balances[sdex_integration.base_asset.code] * .99, total_base / 10)
-        if amount:
+        if amount > dydx_integration.min_order_amount:
             spread = round(_calculate_spread(price, ask_dydx['price']) * 100, 4)
             logger.info(f'{time.ctime()} SDEX Spread: {spread}% - Selling {amount} units @ price: {price}')
             offer_id = int(sell_offers[0]['id']) if sell_offers else 0
