@@ -42,6 +42,9 @@ class DydxIntegration:
             'price': float(orderbook['asks'][0]['price'])
         }
 
+    def get_user(self):
+        return self.client.private.get_user().data['user']
+
     def get_account(self):
         return self.client.private.get_account(
             ethereum_address=os.getenv('DYDX_ETH_ADDRESS')

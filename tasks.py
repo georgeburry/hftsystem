@@ -13,6 +13,8 @@ dydx_integration = DydxIntegration()
 sdex_integration = SdexIntegration()
 
 liquidity = 0
+user = None
+dydx_trailing_volume = 0
 
 
 def _calculate_spread(price_1: float, price_2: float):
@@ -155,15 +157,19 @@ def _save_equity_pnl(total_equity, file_name='results.json'):
 @trading_tasks.job(interval=timedelta(seconds=5))
 def run_arbitrage_strategy():
     try:
-        _post_buy_order_if_opportunity()
-        _post_sell_order_if_opportunity()
+        if dydx_trailing_volume > 100000:
+            logger.warning('Trading halted! User: {user["publicId"]} DYDX 30D trailing volume has exceeded 100,000 USD')
+        else:
+            _post_buy_order_if_opportunity()
+            _post_sell_order_if_opportunity()
     except Exception as e:
-        logging.error(f'{time.ctime()} {e}')
+        logger.error(f'{time.ctime()} {e}')
 
 
 @trading_tasks.job(interval=timedelta(seconds=1))
 def update_hedge():
     try:
+        global user, dydx_trailing_volume
         dydx_position = dydx_integration.get_open_positions()
         dydx_position = float(dydx_position['size']) if dydx_position else 0
         sdex_balances = sdex_integration.get_balances()
@@ -173,8 +179,10 @@ def update_hedge():
             _increase_hedge_position(discrepancy, sdex_balances)
         elif discrepancy < -dydx_integration.min_order_amount:
             _decrease_hedge_position(discrepancy, sdex_balances) 
+        user = dydx_integration.get_user()
+        dydx_trailing_volume = float(user['makerVolume30D']) + float(user['takerVolume30D'])
     except Exception as e:
-        logging.error(f'{time.ctime()} {e}')
+        logger.error(f'{time.ctime()} {e}')
 
 
 def run_trading_tasks():
