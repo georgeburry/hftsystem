@@ -13,8 +13,8 @@ def create_binance_connector():
     return BinanceClient(**credentials)
 
 
-def create_dydx_connector():
-    credentials = get_dydx_credentials()
+def create_dydx_connector(instance: int):
+    credentials = get_dydx_credentials(instance)
     return DydxClient(**credentials)
 
 

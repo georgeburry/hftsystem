@@ -16,8 +16,10 @@ class BinanceIntegration:
     def __init__(self):
         self.client = create_binance_connector()
         self.account = self.get_account()
-        self.asset = os.getenv('ASSET')
-        self.other_assets = os.getenv('OTHER_ASSETS').split(',') if os.getenv('OTHER_ASSETS') else []
+        self.assets = os.getenv('BINANCE_ASSETS').split(',')
+        self.asset = self.assets[0]  # TODO Provide a proper solution
+        self.price_differential = float(os.getenv('PRICE_DIFFERENTIAL'))
+        self.order_type = os.getenv('ORDER_TYPE')
 
     def get_all_tickers(self):
         return self.client.get_all_tickers()
@@ -36,7 +38,7 @@ class BinanceIntegration:
         balances = self.get_account()['balances']
         balances = [
             balance for balance in balances
-            if balance['asset'] in [self.asset, 'BUSD'] + self.other_assets
+            if balance['asset'] in [self.assets] + ['BUSD']
         ]
         tickers = self.get_all_tickers()
         total_balance = 0
@@ -121,13 +123,15 @@ class BinanceIntegration:
 
 
 class DydxIntegration:
-    def __init__(self, leverage: float = 1.0):
-        self.client = create_dydx_connector()
+    def __init__(self, instance: int, asset: str, leverage: float = 1.0):
+        self.instance = instance
+        self.client = create_dydx_connector(instance)
         self.account = self.get_account() 
-        self.asset = os.getenv('ASSET')
+        self.asset = asset
         self.market = self.asset + '-USD'
-        self.min_order_amount = float(os.getenv('MIN_ORDER_AMOUNT'))
-        self.step_size = float(os.getenv('STEP_SIZE'))
+        self.min_order_amount = float(os.getenv(f'DYDX_MIN_ORDER_AMOUNT_{instance}'))
+        self.step_size = float(os.getenv(f'DYDX_STEP_SIZE_{instance}'))
+        self.tick_size = float(os.getenv(f'DYDX_TICK_SIZE_{instance}'))
         self.max_slippage = float(os.getenv('MAX_SLIPPAGE'))
         self.leverage = leverage
 
@@ -156,7 +160,7 @@ class DydxIntegration:
 
     def get_account(self):
         return self.client.private.get_account(
-            ethereum_address=os.getenv('DYDX_ETH_ADDRESS')
+            ethereum_address=os.getenv(f'DYDX_ETH_ADDRESS_{self.instance}')
         ).data['account']
 
     def get_equity(self):
@@ -178,7 +182,7 @@ class DydxIntegration:
         }
 
     def create_market_buy_order(self, price: float, amount: float):
-        price = round(price // 0.0001 * 0.0001, 4)
+        price = round(price // self.tick_size * self.tick_size, 4)
         placed_order = self.client.private.create_order(
             position_id=self.account['positionId'],
             market=self.market,
@@ -194,7 +198,7 @@ class DydxIntegration:
         return placed_order
 
     def create_market_sell_order(self, price: float, amount: float):
-        price = round(price // 0.0001 * 0.0001, 4)
+        price = round(price // self.tick_size * self.tick_size, 4)
         placed_order = self.client.private.create_order(
             position_id=self.account['positionId'],
             market=self.market,
@@ -219,10 +223,10 @@ class SdexIntegration:
             'USDC': 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
         }
         self.client, self.keypair = create_sdex_connector()
-        self.base_asset = Asset(os.getenv('ASSET'), issuer=issuers[os.getenv('ASSET')])
+        self.base_asset = Asset(os.getenv('SDEX_ASSET'), issuer=issuers[os.getenv('SDEX_ASSET')])
         self.counter_asset = Asset('USDC', issuer=issuers['USDC'])
         self.price_differential = float(os.getenv('PRICE_DIFFERENTIAL'))
-        self.order_type = os.getenv('SDEX_ORDER_TYPE')
+        self.order_type = os.getenv('ORDER_TYPE')
 
     def get_orderbook(self):
         return self.client.orderbook(self.base_asset, self.counter_asset).call()

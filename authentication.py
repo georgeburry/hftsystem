@@ -12,14 +12,14 @@ def get_binance_credentials():
     }
 
 
-def get_dydx_credentials():
+def get_dydx_credentials(instance: int):
     return {
-        'host': os.getenv('DYDX_HOST'),
-        'stark_private_key': os.getenv('DYDX_STARK_PRIVATE_KEY'),
+        'host': os.getenv(f'DYDX_HOST'),
+        'stark_private_key': os.getenv(f'DYDX_STARK_PRIVATE_KEY_{instance}'),
         'api_key_credentials': {
-            'key': os.getenv('DYDX_KEY'),
-            'secret': os.getenv('DYDX_SECRET'),
-            'passphrase': os.getenv('DYDX_PASSPHRASE'),
+            'key': os.getenv(f'DYDX_KEY_{instance}'),
+            'secret': os.getenv(f'DYDX_SECRET_{instance}'),
+            'passphrase': os.getenv(f'DYDX_PASSPHRASE_{instance}'),
         }
     }
 
