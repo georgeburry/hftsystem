@@ -75,7 +75,7 @@ def _binance_buy_if_opportunity():
         amount = round(min(amount, quote_as_base * .99, total_base / 10), dp)
         if amount > dydx_integration.min_order_amount:
             spread = round(_calculate_spread(price, bid_dydx['price']) * 100, 4)
-            logger.warning(f'{time.ctime()} SDEX Spread: {spread}% - Buying {amount} units @ price: {price}')
+            logger.warning(f'{time.ctime()} Binance Spread: {spread}% - Buying {amount} units @ price: {price}')
             response = integration.create_market_buy_order(amount)
             logger.info(response)
     elif buy_orders:
@@ -98,7 +98,7 @@ def _binance_sell_if_opportunity():
         amount = round(min(amount, balances['base'] * .99, total_base / 10), dp)
         if amount > dydx_integration.min_order_amount:
             spread = round(_calculate_spread(price, ask_dydx['price']) * 100, 4)
-            logger.warning(f'{time.ctime()} SDEX Spread: {spread}% - Selling {amount} units @ price: {price}')
+            logger.warning(f'{time.ctime()} Binance Spread: {spread}% - Selling {amount} units @ price: {price}')
             response = integration.create_market_sell_order(amount)
             logger.info(response)
     elif sell_orders:
