@@ -67,6 +67,8 @@ def _binance_buy_if_opportunity():
     bid_dydx = dydx_integration.get_first_bid()
     price, amount = _get_best_price_amount('buy', bid_dydx['price'])
     if price and amount:
+        spread = round(_calculate_spread(price, bid_dydx['price']) * 100, 4)
+        logger.info(f'{time.ctime()} Binance - Spread: {spread}% ({amount} units @ price: {price})')
         balances = integration.get_free_balances()
         quote_as_base = balances['quote'] / price
         total_base = balances['base'] + quote_as_base
@@ -74,8 +76,7 @@ def _binance_buy_if_opportunity():
         dp = len(str(amount).split('.')[1])
         amount = round(min(amount, quote_as_base * .99, total_base / 10), dp)
         if amount > dydx_integration.min_order_amount:
-            spread = round(_calculate_spread(price, bid_dydx['price']) * 100, 4)
-            logger.warning(f'{time.ctime()} Binance Spread: {spread}% - Buying {amount} units @ price: {price}')
+            logger.warning(f'{time.ctime()} Binance - Buying {amount} units @ price: {price}')
             response = integration.create_market_buy_order(amount)
             logger.info(response)
     elif buy_orders:
@@ -90,6 +91,8 @@ def _binance_sell_if_opportunity():
     ask_dydx = dydx_integration.get_first_ask()
     price, amount = _get_best_price_amount('sell', ask_dydx['price'])
     if price and amount:
+        spread = round(_calculate_spread(price, ask_dydx['price']) * 100, 4)
+        logger.info(f'{time.ctime()} Binance - Spread: {spread}% ({amount} units @ price: {price})')
         balances = integration.get_free_balances()
         quote_as_base = balances['quote'] / price
         total_base = balances['base'] + quote_as_base
@@ -97,8 +100,7 @@ def _binance_sell_if_opportunity():
         dp = len(str(amount).split('.')[1])
         amount = round(min(amount, balances['base'] * .99, total_base / 10), dp)
         if amount > dydx_integration.min_order_amount:
-            spread = round(_calculate_spread(price, ask_dydx['price']) * 100, 4)
-            logger.warning(f'{time.ctime()} Binance Spread: {spread}% - Selling {amount} units @ price: {price}')
+            logger.warning(f'{time.ctime()} Binance - Selling {amount} units @ price: {price}')
             response = integration.create_market_sell_order(amount)
             logger.info(response)
     elif sell_orders:
@@ -113,14 +115,15 @@ def _sdex_buy_if_opportunity():
     bid_dydx = dydx_integration.get_first_bid()
     price, amount = _get_best_price_amount('buy', bid_dydx['price'])
     if price and amount:
+        spread = round(_calculate_spread(price, bid_dydx['price']) * 100, 4)
+        logger.info(f'{time.ctime()} SDEX - Spread: {spread}% ({amount} units @ price: {price})')
         balances = integration.get_balances()
         quote_as_base = balances['USDC'] / price
         total_base = balances[integration.base_asset.code] + quote_as_base
         liquidity = min(bid_dydx['amount'], amount)  # Update liquidity for use in record keeping
         amount = min(amount, quote_as_base * .99, total_base / 10)
         if amount > dydx_integration.min_order_amount:
-            spread = round(_calculate_spread(price, bid_dydx['price']) * 100, 4)
-            logger.warning(f'{time.ctime()} SDEX Spread: {spread}% - Buying {amount} units @ price: {price}')
+            logger.warning(f'{time.ctime()} SDEX - Buying {amount} units @ price: {price}')
             offer_id = int(buy_offers[0]['id']) if buy_offers else 0
             integration.post_buy_order(price, amount, offer_id)
     elif buy_offers:  # Cancel any outstanding offers by setting amount to 0
@@ -135,14 +138,15 @@ def _sdex_sell_if_opportunity():
     ask_dydx = dydx_integration.get_first_ask()
     price, amount = _get_best_price_amount('sell', ask_dydx['price'])
     if price and amount:
+        spread = round(_calculate_spread(price, ask_dydx['price']) * 100, 4)
+        logger.info(f'{time.ctime()} SDEX - Spread: {spread}% ({amount} units @ price: {price})')
         balances = integration.get_balances()
         quote_as_base = balances['USDC'] / price
         total_base = balances[integration.base_asset.code] + quote_as_base
         liquidity = min(ask_dydx['amount'], amount)  # Update liquidity for use in record keeping
         amount = min(amount, balances[integration.base_asset.code] * .99, total_base / 10)
         if amount > dydx_integration.min_order_amount:
-            spread = round(_calculate_spread(price, ask_dydx['price']) * 100, 4)
-            logger.warning(f'{time.ctime()} SDEX Spread: {spread}% - Selling {amount} units @ price: {price}')
+            logger.warning(f'{time.ctime()} SDEX - Selling {amount} units @ price: {price}')
             offer_id = int(sell_offers[0]['id']) if sell_offers else 0
             integration.post_sell_order(price, amount, offer_id)
     elif sell_offers:  # Cancel any outstanding offers by setting amount to 0
