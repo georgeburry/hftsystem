@@ -13,19 +13,33 @@ from dydx3.constants import (
 
 
 class BinanceIntegration:
-    def __init__(self):
+    def __init__(self, quote_asset='BUSD'):
         self.client = create_binance_connector()
         self.account = self.get_account()
         self.assets = os.getenv('BINANCE_ASSETS').split(',')
         self.asset = self.assets[0]  # TODO Provide a proper solution
-        self.price_differential = float(os.getenv('PRICE_DIFFERENTIAL'))
-        self.order_type = os.getenv('ORDER_TYPE')
+        self.quote_asset = quote_asset
+        self.price_differential = float(os.getenv('BINANCE_PRICE_DIFFERENTIAL'))
+        self.order_type = os.getenv('BINANCE_ORDER_TYPE')
+        self.filters = {asset: self.get_symbol_filters(asset) for asset in self.assets}
+
+    def get_exchange_info(self):
+        return self.client.get_exchange_info()
+
+    def get_symbol_filters(self, asset: str):
+        exchange_info = self.get_exchange_info()
+        symbol = asset + self.quote_asset
+        filters = [s for s in exchange_info['symbols'] if s['symbol'] == symbol][0]['filters']
+        return {
+            'price_filters': [f for f in filters if f['filterType'] == 'PRICE_FILTER'][0],
+            'lot_size': [f for f in filters if f['filterType'] == 'LOT_SIZE'][0],
+        }
 
     def get_all_tickers(self):
         return self.client.get_all_tickers()
 
     def get_orderbook(self):
-        return self.client.get_order_book(symbol=self.asset + 'BUSD')
+        return self.client.get_order_book(symbol=self.asset + self.quote_asset)
 
     def get_midmarket_price(self):
         orderbook = self.get_orderbook()
@@ -38,15 +52,15 @@ class BinanceIntegration:
         balances = self.get_account()['balances']
         balances = [
             balance for balance in balances
-            if balance['asset'] in [self.assets] + ['BUSD']
+            if balance['asset'] in [self.assets] + [self.quote_asset]
         ]
         tickers = self.get_all_tickers()
         total_balance = 0
         for balance in balances:
-            if balance['asset'] != 'BUSD':
+            if balance['asset'] != self.quote_asset:
                 price = float([
                     ticker for ticker in tickers
-                    if ticker['symbol'] == balance['asset'] + 'BUSD'
+                    if ticker['symbol'] == balance['asset'] + self.quote_asset 
                 ][0]['price'])
             else:
                 price = 1
@@ -61,18 +75,18 @@ class BinanceIntegration:
         return float(response['free']) + float(response['locked'])
 
     def get_total_quote_balance(self):
-        response = self.get_asset_balance('BUSD')
+        response = self.get_asset_balance(self.quote_asset)
         return float(response['free']) + float(response['locked'])
 
     def get_free_base_balance(self):
         return float(self.get_asset_balance(self.asset)['free'])
 
     def get_free_quote_balance(self):
-        return float(self.get_asset_balance('BUSD')['free'])
+        return float(self.get_asset_balance(self.quote_asset)['free'])
 
     def get_free_balances(self):
         base_asset = self.client.get_asset_balance(asset=self.asset)
-        quote_asset = self.client.get_asset_balance(asset='BUSD')
+        quote_asset = self.client.get_asset_balance(asset=self.quote_asset)
         return {
             'base': float(base_asset['free']),
             'quote': float(quote_asset['free']),
@@ -80,20 +94,20 @@ class BinanceIntegration:
 
     def get_total_balances(self):
         base_asset = self.client.get_asset_balance(asset=self.asset)
-        quote_asset = self.client.get_asset_balance(asset='BUSD')
+        quote_asset = self.client.get_asset_balance(asset=self.quote_asset)
         return {
             'base': float(base_asset['free']) + float(base_asset['locked']),
             'quote': float(quote_asset['free']) + float(quote_asset['locked']),
         }
 
     def get_open_orders(self, side=None):
-        orders = self.client.get_open_orders(symbol=self.asset + 'BUSD')
+        orders = self.client.get_open_orders(symbol=self.asset + self.quote_asset)
         if side:
             orders = [order for order in orders if order['side'] == side.upper()]
         return orders
 
     def get_last_trade(self):
-        trades = self.client.get_my_trades(symbol=self.asset + 'BUSD')
+        trades = self.client.get_my_trades(symbol=self.asset + self.quote_asset)
         if not trades:
             return {}
         return {
@@ -104,20 +118,24 @@ class BinanceIntegration:
         }
 
     def create_market_buy_order(self, quantity):
+        step_size = float(self.filters[self.asset]['lot_size']['stepSize'])
+        quantity = round(quantity // step_size * step_size, 8)
         return self.client.order_market_buy(
-            symbol=self.asset + 'BUSD',
+            symbol=self.asset + self.quote_asset,
             quantity=quantity,
         )
 
     def create_market_sell_order(self, quantity):
+        step_size = float(self.filters[self.asset]['lot_size']['stepSize'])
+        quantity = round(quantity // step_size * step_size, 8)
         return self.client.order_market_sell(
-            symbol=self.asset + 'BUSD',
+            symbol=self.asset + self.quote_asset,
             quantity=quantity,
         )
 
     def cancel_order(self, order_id):
         return self.client.cancel_order(
-            symbol=self.asset + 'BUSD',
+            symbol=self.asset + self.quote_asset,
             orderId=order_id,
         )
 
@@ -183,6 +201,7 @@ class DydxIntegration:
 
     def create_market_buy_order(self, price: float, amount: float):
         price = round(price // self.tick_size * self.tick_size, 4)
+        amount = round(amount // self.step_size * self.step_size, 10)
         placed_order = self.client.private.create_order(
             position_id=self.account['positionId'],
             market=self.market,
@@ -199,6 +218,7 @@ class DydxIntegration:
 
     def create_market_sell_order(self, price: float, amount: float):
         price = round(price // self.tick_size * self.tick_size, 4)
+        amount = round(amount // self.step_size * self.step_size, 10)
         placed_order = self.client.private.create_order(
             position_id=self.account['positionId'],
             market=self.market,
@@ -225,8 +245,8 @@ class SdexIntegration:
         self.client, self.keypair = create_sdex_connector()
         self.base_asset = Asset(os.getenv('SDEX_ASSET'), issuer=issuers[os.getenv('SDEX_ASSET')])
         self.counter_asset = Asset('USDC', issuer=issuers['USDC'])
-        self.price_differential = float(os.getenv('PRICE_DIFFERENTIAL'))
-        self.order_type = os.getenv('ORDER_TYPE')
+        self.price_differential = float(os.getenv('SDEX_PRICE_DIFFERENTIAL'))
+        self.order_type = os.getenv('SDEX_ORDER_TYPE')
 
     def get_orderbook(self):
         return self.client.orderbook(self.base_asset, self.counter_asset).call()
