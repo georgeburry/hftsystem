@@ -213,8 +213,10 @@ def backtest(df):
     short_perp = 0
     buy_order = None
     sell_order = None
-    price_diff_buy = float(input('Set the price difference at which to buy (default: -0.0025) [< 0]: ') or -.0025)
-    price_diff_sell = float(input('Set the price difference at which to sell (default: 0.0025) [>= 0]: ') or .0025)
+    price_diff_buy = float(input('Set the price difference at which to buy (default: -0.001) [< 0]: ') or -.001)
+    price_diff_sell = float(input('Set the price difference at which to sell (default: 0.001) [>= 0]: ') or .001)
+    venue_a_spread = float(input('Set venue A spread (default: 0.05%): ') or .0005)
+    venue_b_spread = float(input('Set venue B spread (default: 0.1%): ') or .001)
     last_price_1 = last_price_2 = bid_price_1 = ask_price_1 = None
     price_diff = price_diff_pos = price_diff_neg = 0
     buy_order_created_at = sell_order_created_at = 0
@@ -223,18 +225,22 @@ def backtest(df):
     for idx, row in df.iterrows():
         if isinstance(row['source_1'], list):
             last_price_1 = stats.mean([d['price'] for d in row['source_1']])
-            bid_price_1 = last_price_1 * .9995
-            ask_price_1 = last_price_1 * 1.0005
+            bid_price_1 = last_price_1 * (1 - venue_a_spread)
+            ask_price_1 = last_price_1 * (1 + venue_a_spread)
             quote_volume = sum([d['quote_volume'] for d in row['source_1']])
             
         if isinstance(row['source_2'], list):
             last_price_2 = stats.mean([d['price'] for d in row['source_2']])
-            bid_price_2 = last_price_2 * .999
-            ask_price_2 = last_price_2 * 1.001
+            bid_price_2 = last_price_2 * (1 - venue_b_spread)
+            ask_price_2 = last_price_2 * (1 + venue_b_spread)
         if not last_price_1 or not last_price_2:
             continue
         price_diff_neg = ask_price_1 / bid_price_2 - 1  # Hedge market order needs to sell into bids
         price_diff_pos = bid_price_1 / ask_price_2 - 1  # Hedge market order needs to buy into asks
+        if price_diff_neg < price_diff_buy:
+            print(price_diff_neg)
+        elif price_diff_pos > price_diff_sell:
+            print(price_diff_pos)
 
         if price_diff_neg and balance_quote and price_diff_neg < price_diff_buy: 
             if not buy_order:
