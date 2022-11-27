@@ -73,8 +73,7 @@ def _binance_buy_if_opportunity():
         quote_as_base = balances['quote'] / price
         total_base = balances['base'] + quote_as_base
         liquidity = min(bid_dydx['amount'], amount)  # Update liquidity for use in record keeping
-        dp = len(str(amount).split('.')[1])
-        amount = round(min(amount, quote_as_base * .99, total_base / 10), dp)
+        amount = min(amount, quote_as_base * .99, total_base / 10)
         if amount > dydx_integration.min_order_amount:
             logger.warning(f'{time.ctime()} Binance - Buying {amount} units @ price: {price}')
             response = integration.create_market_buy_order(amount)
@@ -97,8 +96,7 @@ def _binance_sell_if_opportunity():
         quote_as_base = balances['quote'] / price
         total_base = balances['base'] + quote_as_base
         liquidity = min(ask_dydx['amount'], amount)  # Update liquidity for use in record keeping
-        dp = len(str(amount).split('.')[1])
-        amount = round(min(amount, balances['base'] * .99, total_base / 10), dp)
+        amount = min(amount, balances['base'] * .99, total_base / 10)
         if amount > dydx_integration.min_order_amount:
             logger.warning(f'{time.ctime()} Binance - Selling {amount} units @ price: {price}')
             response = integration.create_market_sell_order(amount)
