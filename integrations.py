@@ -19,7 +19,8 @@ class BinanceIntegration:
         self.assets = os.getenv('BINANCE_ASSETS').split(',')
         self.asset = self.assets[0]  # TODO Provide a proper solution
         self.quote_asset = quote_asset
-        self.price_differential = float(os.getenv('BINANCE_PRICE_DIFFERENTIAL'))
+        self.buy_spread = float(os.getenv('BINANCE_BUY_SPREAD'))
+        self.sell_spread = float(os.getenv('BINANCE_SELL_SPREAD'))
         self.order_type = os.getenv('BINANCE_ORDER_TYPE')
         self.filters = {asset: self.get_symbol_filters(asset) for asset in self.assets}
 
@@ -245,7 +246,8 @@ class SdexIntegration:
         self.client, self.keypair = create_sdex_connector()
         self.base_asset = Asset(os.getenv('SDEX_ASSET'), issuer=issuers[os.getenv('SDEX_ASSET')])
         self.counter_asset = Asset('USDC', issuer=issuers['USDC'])
-        self.price_differential = float(os.getenv('SDEX_PRICE_DIFFERENTIAL'))
+        self.buy_spread = float(os.getenv('SDEX_BUY_SPREAD'))
+        self.sell_spread = float(os.getenv('SDEX_SELL_SPREAD'))
         self.order_type = os.getenv('SDEX_ORDER_TYPE')
 
     def get_orderbook(self):
