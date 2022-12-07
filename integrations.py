@@ -244,7 +244,8 @@ class SdexIntegration:
             'USDC': 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
         }
         self.client, self.keypair = create_sdex_connector()
-        self.base_asset = Asset(os.getenv('SDEX_ASSET'), issuer=issuers[os.getenv('SDEX_ASSET')])
+        self.asset = os.getenv('SDEX_ASSET')
+        self.base_asset = Asset(self.asset, issuer=issuers[self.asset])
         self.counter_asset = Asset('USDC', issuer=issuers['USDC'])
         self.buy_spread = float(os.getenv('SDEX_BUY_SPREAD'))
         self.sell_spread = float(os.getenv('SDEX_SELL_SPREAD'))
