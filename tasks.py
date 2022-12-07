@@ -119,7 +119,7 @@ def _sdex_buy_if_opportunity():
         quote_as_base = balances['USDC'] / price
         total_base = balances[integration.base_asset.code] + quote_as_base
         liquidity = min(bid_dydx['amount'], amount)  # Update liquidity for use in record keeping
-        amount = min(amount, quote_as_base * .99, total_base / 10)
+        amount = min(amount, quote_as_base, total_base * integration.account_ratio) * .99
         if amount > dydx_integration.min_order_amount:
             logger.warning(f'{time.ctime()} SDEX - Buying {amount} units @ price: {price}')
             offer_id = int(buy_offers[0]['id']) if buy_offers else 0
@@ -142,7 +142,7 @@ def _sdex_sell_if_opportunity():
         quote_as_base = balances['USDC'] / price
         total_base = balances[integration.base_asset.code] + quote_as_base
         liquidity = min(ask_dydx['amount'], amount)  # Update liquidity for use in record keeping
-        amount = min(amount, balances[integration.base_asset.code] * .99, total_base / 10)
+        amount = min(amount, balances[integration.base_asset.code], total_base * integration.account_ratio) * .99
         if amount > dydx_integration.min_order_amount:
             logger.warning(f'{time.ctime()} SDEX - Selling {amount} units @ price: {price}')
             offer_id = int(sell_offers[0]['id']) if sell_offers else 0
