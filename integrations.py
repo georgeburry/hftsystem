@@ -22,6 +22,7 @@ class BinanceIntegration:
         self.sell_spread = float(os.getenv('BINANCE_SELL_SPREAD'))
         self.order_type = os.getenv('BINANCE_ORDER_TYPE')
         self.filters = self.get_symbol_filters(asset)
+        self.account_ratio = float(os.getenv('BINANCE_ACCOUNT_RATIO'))
 
     def get_exchange_info(self):
         return self.client.get_exchange_info()
@@ -50,10 +51,6 @@ class BinanceIntegration:
 
     def get_account_balance(self):
         balances = self.get_account()['balances']
-        #balances = [
-        #    balance for balance in balances
-        #    if balance['asset'] in [self.assets] + [self.quote_asset]
-        #]
         tickers = self.get_all_tickers()
         total_balance = 0
         for balance in balances:
@@ -150,14 +147,16 @@ class DydxIntegration:
         self.account = self.get_account() 
         self.asset = asset
         self.market = self.asset + '-USD'
-        self.min_order_amount = float(os.getenv(f'DYDX_MIN_ORDER_AMOUNT_{instance}'))
-        self.step_size = float(os.getenv(f'DYDX_STEP_SIZE_{instance}'))
-        self.tick_size = float(os.getenv(f'DYDX_TICK_SIZE_{instance}'))
+        self.market_info = self.get_market_info()
+        self.min_order_amount = float(self.market_info['minOrderSize'])
+        self.step_size = float(self.market_info['stepSize'])
+        self.tick_size = float(self.market_info['tickSize'])
         self.max_slippage = float(os.getenv('MAX_SLIPPAGE'))
         self.leverage = leverage
 
     def get_market_info(self):
-        return self.client.public.get_markets(self.market).data
+        response = self.client.public.get_markets(self.market).data
+        return response['markets'][self.market]
 
     def get_orderbook(self):
         return self.client.public.get_orderbook(self.market).data
