@@ -23,6 +23,7 @@ class BinanceIntegration:
         self.order_type = os.getenv('BINANCE_ORDER_TYPE')
         self.filters = self.get_symbol_filters(asset)
         self.account_ratio = float(os.getenv('BINANCE_ACCOUNT_RATIO'))
+        self.spread = float(os.getenv('BINANCE_SPREAD')) or .01
 
     def get_exchange_info(self):
         response = self.client.get_exchange_info()
@@ -273,6 +274,7 @@ class SdexIntegration:
         self.sell_spread = float(os.getenv('SDEX_SELL_SPREAD'))
         self.order_type = os.getenv('SDEX_ORDER_TYPE')
         self.account_ratio = float(os.getenv('SDEX_ACCOUNT_RATIO'))
+        self.spread = float(os.getenv('SDEX_SPREAD')) or .01
 
     def get_orderbook(self):
         return self.client.orderbook(self.base_asset, self.counter_asset).call()

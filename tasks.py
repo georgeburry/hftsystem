@@ -48,13 +48,16 @@ def _get_best_price_amount(side: str, price_2: float):
     for level in order_levels:
         spread = _calculate_spread(level['price'], price_2)
         if (
-            side == 'buy' and spread < integration.buy_spread
-            or side == 'sell' and spread > integration.sell_spread
+            side == 'buy' and spread - integration.spread < integration.buy_spread
+            or side == 'sell' and spread + integration.spread > integration.sell_spread
         ):
             price = level['price']
-            if integration.order_type == 'maker':
-                return level['price'], 1e9
             amount += level['amount']
+            if (
+                integration.order_type == 'maker'
+                and abs(price - order_levels[0]['price']) > integration.spread
+            ):
+                return price, amount
         else:
             break
     return price, amount
