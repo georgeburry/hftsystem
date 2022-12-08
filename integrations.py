@@ -138,7 +138,7 @@ class BinanceIntegration:
         tick_size = float(self.filters['price_filters']['tickSize'])
         quantity = round(quantity // step_size * step_size, 8)
         price = round(price // tick_size * tick_size, 8)
-        response = client.order_limit_buy(
+        response = self.client.order_limit_buy(
             symbol=self.asset + self.quote_asset,
             quantity=quantity,
             price=price,
@@ -151,7 +151,7 @@ class BinanceIntegration:
         tick_size = float(self.filters['price_filters']['tickSize'])
         quantity = round(quantity // step_size * step_size, 8)
         price = round(price // tick_size * tick_size, 8)
-        response = client.order_limit_sell(
+        response = self.client.order_limit_sell(
             symbol=self.asset + self.quote_asset,
             quantity=quantity,
             price=price,
