@@ -209,7 +209,7 @@ class DydxIntegration:
 
     def get_open_positions(self):
         open_positions = self.get_account()['openPositions']
-        return open_positions[self.market] if open_positions else {}
+        return open_positions.get(self.market) or {}
 
     def get_last_trade(self):
         trades = self.client.private.get_fills(market=self.market, limit=1).data['fills']
