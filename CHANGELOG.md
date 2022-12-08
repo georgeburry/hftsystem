@@ -6,3 +6,4 @@
 - Trading system: taker orders for SDEX
 - Trading system: multi-level checking of orderbook
 - Trading system: Binance integration & multiple hedge accounts
+- Trading system: Binance select asset on system launch

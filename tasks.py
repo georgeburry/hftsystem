@@ -186,7 +186,7 @@ def _calculate_total_equity(balances):
     return venue_a_equity + dydx_equity
 
 
-def _save_equity_pnl(total_equity, file_name='results.json'):
+def _save_equity_pnl(total_equity, file_name='results'):
     try:
         with open(f'{file_name}_{instance}', 'r') as f:
             results = json.load(f)
@@ -202,7 +202,7 @@ def _save_equity_pnl(total_equity, file_name='results.json'):
         'pnl_this_trade': total_equity / results[-1]['total_equity'] - 1 if results else None,
         'pnl_overall': total_equity / results[0]['total_equity'] - 1 if results else None,
     })
-    with open(f'{file_name}_{instance}', 'w') as f:
+    with open(f'{file_name}_{instance}_{integration.asset}.json', 'w') as f:
         json.dump(results, f)
 
 
@@ -251,8 +251,9 @@ def run_trading_tasks():
     global venue, integration, dydx_integration, instance
     venue_input = input('Select the venue:\n\nA) Binance\nB) SDEX\n\n')
     venue = {'A': 'binance', 'B': 'sdex'}.get(venue_input.upper())
+    asset = input('Enter the asset code (e.g. BTC): ') or None
     if venue == 'binance':
-        integration = BinanceIntegration()
+        integration = BinanceIntegration(asset=asset)
     elif venue == 'sdex':
         integration = SdexIntegration()
     instance = int(input('Enter the venue instance for hedging [integer]: '))

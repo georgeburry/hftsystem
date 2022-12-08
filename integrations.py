@@ -13,16 +13,15 @@ from dydx3.constants import (
 
 
 class BinanceIntegration:
-    def __init__(self, quote_asset='BUSD'):
+    def __init__(self, asset: str = None, quote_asset: str = 'BUSD'):
         self.client = create_binance_connector()
         self.account = self.get_account()
-        self.assets = os.getenv('BINANCE_ASSETS').split(',')
-        self.asset = self.assets[0]  # TODO Provide a proper solution
+        self.asset = asset or os.getenv('BINANCE_ASSET')
         self.quote_asset = quote_asset
         self.buy_spread = float(os.getenv('BINANCE_BUY_SPREAD'))
         self.sell_spread = float(os.getenv('BINANCE_SELL_SPREAD'))
         self.order_type = os.getenv('BINANCE_ORDER_TYPE')
-        self.filters = {asset: self.get_symbol_filters(asset) for asset in self.assets}
+        self.filters = self.get_symbol_filters(asset)
 
     def get_exchange_info(self):
         return self.client.get_exchange_info()
@@ -51,18 +50,21 @@ class BinanceIntegration:
 
     def get_account_balance(self):
         balances = self.get_account()['balances']
-        balances = [
-            balance for balance in balances
-            if balance['asset'] in [self.assets] + [self.quote_asset]
-        ]
+        #balances = [
+        #    balance for balance in balances
+        #    if balance['asset'] in [self.assets] + [self.quote_asset]
+        #]
         tickers = self.get_all_tickers()
         total_balance = 0
         for balance in balances:
             if balance['asset'] != self.quote_asset:
-                price = float([
+                tickers_filtered = [
                     ticker for ticker in tickers
-                    if ticker['symbol'] == balance['asset'] + self.quote_asset 
-                ][0]['price'])
+                    if ticker['symbol'] == balance['asset'] + self.quote_asset
+                ]
+                if not tickers_filtered:
+                    continue
+                price = float(tickers_filtered[0]['price'])
             else:
                 price = 1
             total_balance += float(balance['free']) * price + float(balance['locked']) * price
@@ -119,7 +121,7 @@ class BinanceIntegration:
         }
 
     def create_market_buy_order(self, quantity):
-        step_size = float(self.filters[self.asset]['lot_size']['stepSize'])
+        step_size = float(self.filters['lot_size']['stepSize'])
         quantity = round(quantity // step_size * step_size, 8)
         return self.client.order_market_buy(
             symbol=self.asset + self.quote_asset,
@@ -127,7 +129,7 @@ class BinanceIntegration:
         )
 
     def create_market_sell_order(self, quantity):
-        step_size = float(self.filters[self.asset]['lot_size']['stepSize'])
+        step_size = float(self.filters['lot_size']['stepSize'])
         quantity = round(quantity // step_size * step_size, 8)
         return self.client.order_market_sell(
             symbol=self.asset + self.quote_asset,
