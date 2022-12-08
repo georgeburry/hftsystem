@@ -25,10 +25,13 @@ class BinanceIntegration:
         self.account_ratio = float(os.getenv('BINANCE_ACCOUNT_RATIO'))
 
     def get_exchange_info(self):
-        return self.client.get_exchange_info()
+        response = self.client.get_exchange_info()
+        time.sleep(1)
+        return response
 
     def get_symbol_filters(self, asset: str):
         exchange_info = self.get_exchange_info()
+        time.sleep(1)
         symbol = asset + self.quote_asset
         filters = [s for s in exchange_info['symbols'] if s['symbol'] == symbol][0]['filters']
         return {
@@ -37,17 +40,23 @@ class BinanceIntegration:
         }
 
     def get_all_tickers(self):
-        return self.client.get_all_tickers()
+        response = self.client.get_all_tickers()
+        time.sleep(1)
+        return response
 
     def get_orderbook(self):
-        return self.client.get_order_book(symbol=self.asset + self.quote_asset)
+        response = self.client.get_order_book(symbol=self.asset + self.quote_asset)
+        time.sleep(1)
+        return response
 
     def get_midmarket_price(self):
         orderbook = self.get_orderbook()
         return (float(orderbook['bids'][0][0]) + float(orderbook['asks'][0][0])) / 2
 
     def get_account(self):
-        return self.client.get_account()
+        response = self.client.get_account()
+        time.sleep(1)
+        return response
 
     def get_account_balance(self):
         balances = self.get_account()['balances']
@@ -86,7 +95,9 @@ class BinanceIntegration:
 
     def get_free_balances(self):
         base_asset = self.client.get_asset_balance(asset=self.asset)
+        time.sleep(1)
         quote_asset = self.client.get_asset_balance(asset=self.quote_asset)
+        time.sleep(1)
         return {
             'base': float(base_asset['free']),
             'quote': float(quote_asset['free']),
@@ -94,7 +105,9 @@ class BinanceIntegration:
 
     def get_total_balances(self):
         base_asset = self.client.get_asset_balance(asset=self.asset)
+        time.sleep(1)
         quote_asset = self.client.get_asset_balance(asset=self.quote_asset)
+        time.sleep(1)
         return {
             'base': float(base_asset['free']) + float(base_asset['locked']),
             'quote': float(quote_asset['free']) + float(quote_asset['locked']),
@@ -102,12 +115,14 @@ class BinanceIntegration:
 
     def get_open_orders(self, side=None):
         orders = self.client.get_open_orders(symbol=self.asset + self.quote_asset)
+        time.sleep(1)
         if side:
             orders = [order for order in orders if order['side'] == side.upper()]
         return orders
 
     def get_last_trade(self):
         trades = self.client.get_my_trades(symbol=self.asset + self.quote_asset)
+        time.sleep(1)
         if not trades:
             return {}
         return {
@@ -120,24 +135,30 @@ class BinanceIntegration:
     def create_market_buy_order(self, quantity):
         step_size = float(self.filters['lot_size']['stepSize'])
         quantity = round(quantity // step_size * step_size, 8)
-        return self.client.order_market_buy(
+        response = self.client.order_market_buy(
             symbol=self.asset + self.quote_asset,
             quantity=quantity,
         )
+        time.sleep(1)
+        return response
 
     def create_market_sell_order(self, quantity):
         step_size = float(self.filters['lot_size']['stepSize'])
         quantity = round(quantity // step_size * step_size, 8)
-        return self.client.order_market_sell(
+        response = self.client.order_market_sell(
             symbol=self.asset + self.quote_asset,
             quantity=quantity,
         )
+        time.sleep(1)
+        return response
 
     def cancel_order(self, order_id):
-        return self.client.cancel_order(
+        response = self.client.cancel_order(
             symbol=self.asset + self.quote_asset,
             orderId=order_id,
         )
+        time.sleep(1)
+        return response
 
 
 class DydxIntegration:

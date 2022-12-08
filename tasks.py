@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import time
 from timeloop import Timeloop
 from datetime import datetime, timedelta
@@ -206,7 +207,7 @@ def _save_equity_pnl(total_equity, file_name='results'):
         json.dump(results, f)
 
 
-@trading_tasks.job(interval=timedelta(seconds=5))
+@trading_tasks.job(interval=timedelta(seconds=int(os.getenv('REFRESH_PERIOD')) or 5))
 def run_arbitrage_strategy():
     try:
         if dydx_trailing_volume > 100000:
