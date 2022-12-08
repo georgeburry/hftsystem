@@ -133,6 +133,32 @@ class BinanceIntegration:
             'amount': float(trades[-1]['qty']),
         }
 
+    def create_limit_buy_order(self, price, quantity):
+        step_size = float(self.filters['lot_size']['stepSize'])
+        tick_size = float(self.filters['price_filters']['tickSize'])
+        quantity = round(quantity // step_size * step_size, 8)
+        price = round(price // tick_size * tick_size, 8)
+        response = client.order_limit_buy(
+            symbol=self.asset + self.quote_asset,
+            quantity=quantity,
+            price=price,
+        )
+        time.sleep(1)
+        return response
+
+    def create_limit_sell_order(self, price, quantity):
+        step_size = float(self.filters['lot_size']['stepSize'])
+        tick_size = float(self.filters['price_filters']['tickSize'])
+        quantity = round(quantity // step_size * step_size, 8)
+        price = round(price // tick_size * tick_size, 8)
+        response = client.order_limit_sell(
+            symbol=self.asset + self.quote_asset,
+            quantity=quantity,
+            price=price,
+        )
+        time.sleep(1)
+        return response
+
     def create_market_buy_order(self, quantity):
         step_size = float(self.filters['lot_size']['stepSize'])
         quantity = round(quantity // step_size * step_size, 8)

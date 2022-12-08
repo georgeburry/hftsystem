@@ -80,7 +80,7 @@ def _binance_buy_if_opportunity():
         amount = min(amount, quote_as_base, total_base * integration.account_ratio) * .99
         if amount > dydx_integration.min_order_amount:
             logger.warning(f'{time.ctime()} Binance - Buying {amount} units @ price: {price}')
-            response = integration.create_market_buy_order(amount)
+            response = integration.create_limit_buy_order(price, amount)
             logger.info(response)
     elif buy_orders:
         for order in buy_orders:
@@ -103,7 +103,7 @@ def _binance_sell_if_opportunity():
         amount = min(amount, balances['base'], total_base * integration.account_ratio) * .99
         if amount > dydx_integration.min_order_amount:
             logger.warning(f'{time.ctime()} Binance - Selling {amount} units @ price: {price}')
-            response = integration.create_market_sell_order(amount)
+            response = integration.create_limit_sell_order(price, amount)
             logger.info(response)
     elif sell_orders:
         for order in sell_orders:
