@@ -6,3 +6,4 @@ pytest==4.6.11
 python-binance==1.0.16
 python-dotenv==0.21.0
 stellar-sdk==8.1.1
+timeloop==1.0.2
