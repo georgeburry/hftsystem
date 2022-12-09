@@ -37,6 +37,7 @@ class BinanceIntegration:
         filters = [s for s in exchange_info['symbols'] if s['symbol'] == symbol][0]['filters']
         return {
             'price_filters': [f for f in filters if f['filterType'] == 'PRICE_FILTER'][0],
+            'min_notional': [f for f in filters if f['filterType'] == 'MIN_NOTIONAL'][0],
             'lot_size': [f for f in filters if f['filterType'] == 'LOT_SIZE'][0],
         }
 

@@ -57,7 +57,7 @@ def _get_best_price_amount(side: str, price_2: float):
                 integration.order_type == 'maker'
                 and abs(price - order_levels[0]['price']) > integration.spread
             ):
-                return price, amount
+                return price, 1e9
         else:
             break
     return price, amount
@@ -71,14 +71,15 @@ def _binance_buy_if_opportunity():
     bid_dydx = dydx_integration.get_first_bid()
     price, amount = _get_best_price_amount('buy', bid_dydx['price'])
     if price and amount:
-        spread = round(_calculate_spread(price, bid_dydx['price']) * 100, 4)
-        logger.info(f'{time.ctime()} Binance - Spread: {spread}% ({amount} units @ price: {price})')
         balances = integration.get_free_balances()
         quote_as_base = balances['quote'] / price
         total_base = balances['base'] + quote_as_base
+        min_notional = float(integration.filters['min_notional']['minNotional']) / price * 1.01
+        amount = min(amount, quote_as_base, max(min_notional, total_base * integration.account_ratio)) * .99
         liquidity = min(bid_dydx['amount'], amount)  # Update liquidity for use in record keeping
-        amount = min(amount, quote_as_base, total_base * integration.account_ratio) * .99
-        if amount > dydx_integration.min_order_amount:
+        spread = round(_calculate_spread(price, bid_dydx['price']) * 100, 4)
+        logger.info(f'{time.ctime()} Binance - Spread: {spread}% ({amount} units @ price: {price})')
+        if amount > dydx_integration.min_order_amount and amount > min_notional:
             logger.warning(f'{time.ctime()} Binance - Buying {amount} units @ price: {price}')
             response = integration.create_limit_buy_order(price, amount)
             logger.info(response)
@@ -94,14 +95,15 @@ def _binance_sell_if_opportunity():
     ask_dydx = dydx_integration.get_first_ask()
     price, amount = _get_best_price_amount('sell', ask_dydx['price'])
     if price and amount:
-        spread = round(_calculate_spread(price, ask_dydx['price']) * 100, 4)
-        logger.info(f'{time.ctime()} Binance - Spread: {spread}% ({amount} units @ price: {price})')
         balances = integration.get_free_balances()
         quote_as_base = balances['quote'] / price
         total_base = balances['base'] + quote_as_base
+        min_notional = float(integration.filters['min_notional']['minNotional']) / price * 1.01
+        amount = min(amount, balances['base'], max(min_notional, total_base * integration.account_ratio)) * .99
         liquidity = min(ask_dydx['amount'], amount)  # Update liquidity for use in record keeping
-        amount = min(amount, balances['base'], total_base * integration.account_ratio) * .99
-        if amount > dydx_integration.min_order_amount:
+        spread = round(_calculate_spread(price, ask_dydx['price']) * 100, 4)
+        logger.info(f'{time.ctime()} Binance - Spread: {spread}% ({amount} units @ price: {price})')
+        if amount > dydx_integration.min_order_amount and amount > min_notional:
             logger.warning(f'{time.ctime()} Binance - Selling {amount} units @ price: {price}')
             response = integration.create_limit_sell_order(price, amount)
             logger.info(response)
