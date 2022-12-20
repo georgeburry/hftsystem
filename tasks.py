@@ -194,7 +194,7 @@ def _calculate_total_equity(balances):
 
 def _save_equity_pnl(total_equity, file_name='results'):
     try:
-        with open(f'{file_name}_{instance}', 'r') as f:
+        with open(f'{file_name}_{instance}_{integration.asset}.json', 'r') as f:
             results = json.load(f)
     except FileNotFoundError:
         results = []
